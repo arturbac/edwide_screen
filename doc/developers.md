@@ -18,8 +18,10 @@
 - Each change of state is one log line: `on`, `on again`, `off: <why>` (wings 0, no layout, another size, no field of
   view, a multisampled picture, objects not made). A fault or C++ exception in the hook turns it off for the session,
   logged; the game's `Present` is still called.
-- The arithmetic (`src/wings_math.h`, the shader the same): the game's picture plane stands `D = (H/2)/tan(vfov/2)`
-  pixels from the eye; a side monitor is turned by the angle about its hinge with the middle; its pixel `a` pixels from
+- The arithmetic (`src/wings_math.h`, the shader the same): the plane the middle monitor's picture stands in is `D`
+  pixels from the eye - the eyes' own distance (`wings_eye_cm x wings_center_px / wings_center_cm`) when set, as the
+  sides must go on from the middle as the eyes see it whatever the game's field of view; else the distance that field
+  of view draws for, `(H/2)/tan(vfov/2)`; a side monitor is turned by the angle about its hinge with the middle; its pixel `a` pixels from
   the hinge is at `P = (half + a cos, y, D - a sin)` (or on a cylinder about the eye, by `wings_curve`); the colour
   comes from where the ray from the eye through `P` meets the picture plane, `(P.x D/P.z, P.y D/P.z)`, then the zoom
   about the hinge and the offset. Behind a bezel, past the eye's side or outside the picture: black. The middle is

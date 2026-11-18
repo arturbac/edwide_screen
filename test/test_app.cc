@@ -251,6 +251,28 @@ auto main() -> int
   auto const outer{edwide::wings_source(layout, 959.5f, 200.5f)};
   check(not outer or outer->y > 200.5f, "the outer edge takes a row further from the middle (the picture squeezed there)");
 
+  // the eyes' distance set (80 cm, the middle 48 cm wide: 10 pixels a cm, the plane 800 pixels away): the sides as
+  // seen from there, whatever the field of view
+  write_ini("wings = 1\nwings_angle = 30\nwings_center_px = 480\nwings_side_px = 240\nwings_fov = 60\nwings_eye_cm = 80\nwings_center_cm = 48\n");
+  (void)present(a);
+  {
+  std::vector<std::uint32_t> const seen{present(a)};
+  edwide::wings_layout_t eye_layout{layout};
+  eye_layout.plane = 800.f;
+  int eye_worst{}, eye_checked{};
+  for(UINT y{2}; y < a.height - 2; y += 7)
+    for(UINT x{}; x < 238; x += 5)
+      if(auto const from{edwide::wings_source(eye_layout, x + 0.5f, y + 0.5f)};
+         from and from->x >= 1.f and from->y >= 1.f and from->x <= a.width - 1.f and from->y <= a.height - 1.f)
+        {
+        std::uint32_t const c{seen[y * a.width + x]};
+        eye_worst = std::max({eye_worst, std::abs(channel(c, 0) - static_cast<int>(std::lround(from->x * 255.0 / a.width))),
+                              std::abs(channel(c, 1) - static_cast<int>(std::lround(from->y * 255.0 / a.height)))});
+        ++eye_checked;
+        }
+  check(eye_checked > 200 and eye_worst <= 3 and not same(seen, turned, 1), "wings_eye_cm: the sides as seen from the eyes' distance");
+  }
+
   write_ini("wings = 1\nwings_angle = 0\nwings_center_px = 480\nwings_side_px = 240\nwings_fov = 60\n");
   (void)present(a);
   check(same(present(a), plain, 1), "angle 0: the picture as it was");

@@ -100,6 +100,8 @@ namespace
     float side_px{0.f};        ///< each side monitor's width; 0 = the rest of the picture
     float bezel_px{0.f};       ///< the picture's pixels behind the bezels between the middle and a side
     float fov{0.f};            ///< vertical, degrees; 0 = the game's (Settings.xml)
+    float eye_cm{0.f};         ///< the eyes' distance from the middle monitor; with centre_cm the plane's distance itself
+    float centre_cm{0.f};      ///< the middle monitor's picture width, cm (pixels a cm: centre_px / centre_cm)
     float zoom{1.f};
     float curve{0.f};
     float offset_y{0.f};
@@ -119,7 +121,9 @@ namespace
     {"wings_center_px", &settings_t::centre_px, "the middle monitor's width in pixels of the game's picture; 0 = not set (off)"},
     {"wings_side_px", &settings_t::side_px, "each side monitor's width in pixels; 0 = the rest of the picture (any width)"},
     {"wings_bezel_px", &settings_t::bezel_px, "pixels of the picture behind the bezels between the middle and a side (0 = none)"},
-    {"wings_fov", &settings_t::fov, "the game's vertical field of view, degrees; 0 = read from the game's Settings.xml"},
+    {"wings_eye_cm", &settings_t::eye_cm, "your eyes' distance from the middle monitor, cm (with wings_center_cm: the sides as seen from there; 0 = from the field of view)"},
+    {"wings_center_cm", &settings_t::centre_cm, "the middle monitor's picture width, cm (0 = from the field of view)"},
+    {"wings_fov", &settings_t::fov, "only without wings_eye_cm: the game's vertical field of view, degrees; 0 = read from the game's Settings.xml"},
     {"wings_zoom", &settings_t::zoom, "the sides' size: above 1 larger (less black at the corners, more cut off)"},
     {"wings_curve", &settings_t::curve, "0 flat side monitors .. 1 curved ones"},
     {"wings_offset_y", &settings_t::offset_y, "the sides moved up (-) or down (+), pixels"},
@@ -175,9 +179,10 @@ namespace
     s.curve = std::clamp(s.curve, 0.f, 1.f);
     s.angle = std::clamp(s.angle, -80.f, 80.f);
     settings = s;
-    log_line("settings: wings %g, angle %g, centre %g px, side %g px, bezel %g px, fov %g, zoom %g, curve %g, offset %g, guides %g",
-             double(s.wings), double(s.angle), double(s.centre_px), double(s.side_px), double(s.bezel_px), double(s.fov), double(s.zoom),
-             double(s.curve), double(s.offset_y), double(s.guides));
+    log_line("settings: wings %g, angle %g, centre %g px, side %g px, bezel %g px, eye %g cm, centre %g cm, fov %g, zoom %g, curve %g, "
+             "offset %g, guides %g",
+             double(s.wings), double(s.angle), double(s.centre_px), double(s.side_px), double(s.bezel_px), double(s.eye_cm),
+             double(s.centre_cm), double(s.fov), double(s.zoom), double(s.curve), double(s.offset_y), double(s.guides));
     }
 
   ///\brief the ini with every setting as a comment, when there is none
@@ -302,8 +307,8 @@ namespace
     told_width = width;
     told_height = height;
     if(now == state_e::on)
-      log_line("%s: the picture %ux%u, the sides laid over the monitors at %g degrees", again ? "on again" : "on", width, height,
-               double(settings.angle));
+      log_line("%s: the picture %ux%u, the sides laid over the monitors at %g degrees, the eye %s", again ? "on again" : "on", width,
+               height, double(settings.angle), settings.eye_cm > 0.f and settings.centre_cm > 0.f ? "as set (wings_eye_cm)" : "by the field of view");
     else
       log_line("off: %s", why);
     }
@@ -403,9 +408,18 @@ namespace
                     double(settings.centre_px));
       return tell(state_e::off_size, d.Width, d.Height, why);
       }
-    float const fov{settings.fov > 0.f ? settings.fov : game_fov};
-    if(not(fov > 1.f and fov < 179.f))
-      return tell(state_e::off_fov, d.Width, d.Height, "no field of view: none in the game's Settings.xml and wings_fov is 0");
+    // the picture plane's distance from the eye: the eyes' own distance in pixels when it is set (the sides then go on
+    // from the middle monitor as seen from there), else the one the game's field of view draws for
+    float plane{};
+    if(settings.eye_cm > 0.f and settings.centre_cm > 0.f)
+      plane = settings.eye_cm * settings.centre_px / settings.centre_cm;
+    else
+      {
+      float const fov{settings.fov > 0.f ? settings.fov : game_fov};
+      if(not(fov > 1.f and fov < 179.f))
+        return tell(state_e::off_fov, d.Width, d.Height, "no distance: wings_eye_cm and wings_center_cm not set, and no field of view");
+      plane = wings_plane(fov, static_cast<float>(d.Height));
+      }
     if(not make_gpu(device, d))
       return tell(state_e::off_picture, d.Width, d.Height, "the device's objects or the picture's copy could not be made");
     ID3D11RenderTargetView * target{};
@@ -415,7 +429,7 @@ namespace
 
     float const a{settings.angle * 0.017453293f};
     float const constants[12]{static_cast<float>(d.Width), static_cast<float>(d.Height), 0.5f * settings.centre_px, settings.bezel_px,
-                              wings_plane(fov, static_cast<float>(d.Height)), std::cos(a), std::sin(a), settings.curve,
+                              plane, std::cos(a), std::sin(a), settings.curve,
                               settings.zoom, settings.offset_y, settings.guides, 0.f};
     ID3D11DeviceContext * ctx{};
     device->GetImmediateContext(&ctx);
