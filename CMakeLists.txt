@@ -55,7 +55,9 @@ target_include_directories(edwide_screen PRIVATE "${gen}")
 target_link_libraries(edwide_screen PRIVATE kernel32 user32 d3d11 dxgi dxguid)
 target_compile_definitions(edwide_screen PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_compile_options(edwide_screen PRIVATE /W4 "/FI${gen}/edwide_version.h")
-target_link_options(edwide_screen PRIVATE /DEBUG:FULL $<$<NOT:$<CONFIG:Debug>>:/OPT:REF /OPT:ICF>)
+# a chain element of edloader's: its two calls, passed on to the next d3d11 and the factory hooked on the device made
+target_link_options(edwide_screen PRIVATE /DEBUG:FULL $<$<NOT:$<CONFIG:Debug>>:/OPT:REF /OPT:ICF>
+                    /EXPORT:D3D11CreateDevice=edwide_create_device /EXPORT:D3D11CreateDeviceAndSwapChain=edwide_create_device_and_chain)
 set_target_properties(edwide_screen PROPERTIES PREFIX "")
 add_dependencies(edwide_screen edwide_version edwide_generated)
 

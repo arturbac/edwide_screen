@@ -1,5 +1,6 @@
-// edwide_screen: a dll for edloader's list, not a d3d11 proxy (it exports no D3D11CreateDevice, so edloader keeps it
-// loaded and out of the chain). Its one hook, IDXGISwapChain::Present (and Present1), lays the side parts of the
+// edwide_screen: a small element of edloader's chain: its D3D11CreateDevice (and ...AndSwapChain) passes the call on
+// and hooks the device's DXGI factory before the game can make its swap chain (no thread, no device of its own; a
+// thread of its own lost that race, and disturbed EDHM, 2026-11-18). Its hook, IDXGISwapChain::Present (and Present1), lays the side parts of the
 // finished picture over side monitors set at an angle (shaders/wings.hlsl, src/wings_math.h), after the game's
 // upscaling and HUD, before the picture is shown. The picture is taken at each Present and let go before it, so the
 // game's ResizeBuffers never meets a reference of ours; a picture whose size is not the layout's passes untouched,
@@ -20,6 +21,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <initializer_list>
 #include <string>
 
 namespace
@@ -106,6 +108,7 @@ namespace
     float curve{0.f};
     float offset_y{0.f};
     float calibrate{0.f};
+    float hook{1.f};           ///< read at the start: 0 = nothing hooked this session (to find what disturbs another mod)
     };
 
   struct key_t
@@ -116,6 +119,7 @@ namespace
     };
 
   key_t const keys[]{
+    {"wings_hook", &settings_t::hook, "read when the game starts: 1 = the hook in place; 0 = nothing hooked (the calls only passed on), to tell whether another mod is disturbed by it"},
     {"wings", &settings_t::wings, "1 = the sides laid over monitors set at an angle; 0 = off"},
     {"wings_angle", &settings_t::angle, "the side monitors' angle towards you, degrees (0 = in one line with the middle)"},
     {"wings_center_px", &settings_t::centre_px, "the middle monitor's width in pixels of the game's picture; 0 = not set (off)"},
@@ -268,6 +272,7 @@ namespace
   state_e state{state_e::unknown};
   UINT told_width{}, told_height{};
   std::atomic<bool> hooked{};
+  bool hook_at_start{true};
   thread_local int depth{};
 
   auto release(IUnknown * & u) noexcept -> void
@@ -591,34 +596,39 @@ namespace
     return hr;
     }
 
-  ///\brief a DXGI factory, only for its table of methods: the game's factory is of the same class (Windows' dxgi,
-  /// DXVK's), so the swap chain it makes comes through CreateSwapChain or CreateSwapChainForHwnd, whose Present is then
-  /// hooked. No device and no window of its own
-  DWORD WINAPI install(LPVOID)
+  ///\brief the factory the game's device belongs to (its adapter's parent): CreateSwapChain and CreateSwapChainForHwnd
+  /// hooked in its table, once. The game's own factory, made when it likes, is of the same class (Windows' dxgi,
+  /// DXVK's), so its swap chain comes through them; Present is hooked in that swap chain's table
+  auto hook_factory_of(ID3D11Device * device) noexcept -> void
     {
-    HMODULE const dxgi{LoadLibraryW(L"dxgi.dll")};
-    using factory_fn = HRESULT(WINAPI *)(REFIID, void **);
-    auto const create{dxgi ? reinterpret_cast<factory_fn>(GetProcAddress(dxgi, "CreateDXGIFactory1")) : nullptr};
-    IDXGIFactory1 * factory{};
-    HRESULT const hr{create ? create(__uuidof(IDXGIFactory1), reinterpret_cast<void **>(&factory)) : E_FAIL};
-    if(FAILED(hr) or not factory)
+    static bool done{};
+    if(done or not device)
+      return;
+    done = true;
+    IDXGIDevice * dxgi_device{};
+    IDXGIAdapter * adapter{};
+    IDXGIFactory * factory{};
+    if(SUCCEEDED(device->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void **>(&dxgi_device))) and dxgi_device
+       and SUCCEEDED(dxgi_device->GetAdapter(&adapter)) and adapter
+       and SUCCEEDED(adapter->GetParent(__uuidof(IDXGIFactory), reinterpret_cast<void **>(&factory))) and factory)
       {
-      log_line("hook: no DXGI factory (hr 0x%08lX); nothing is changed", static_cast<unsigned long>(hr));
-      return 0;
+      void ** const table{*reinterpret_cast<void ***>(factory)};
+      bool ok{patch(table, 10, reinterpret_cast<void *>(&hook_create_chain), reinterpret_cast<void **>(&orig_create_chain))};
+      IDXGIFactory2 * factory2{};
+      if(SUCCEEDED(factory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void **>(&factory2))) and factory2)
+        {
+        void ** const table2{*reinterpret_cast<void ***>(factory2)};
+        ok = ok and patch(table2, 15, reinterpret_cast<void *>(&hook_create_hwnd), reinterpret_cast<void **>(&orig_create_hwnd));
+        factory2->Release();
+        }
+      log_line(ok ? "hook: the device's DXGI factory (CreateSwapChain, CreateSwapChainForHwnd), at the game's D3D11CreateDevice"
+                  : "hook: the DXGI factory could not be hooked; nothing is changed");
       }
-    void ** const table{*reinterpret_cast<void ***>(factory)};
-    bool ok{patch(table, 10, reinterpret_cast<void *>(&hook_create_chain), reinterpret_cast<void **>(&orig_create_chain))};
-    IDXGIFactory2 * factory2{};
-    if(SUCCEEDED(factory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void **>(&factory2))) and factory2)
-      {
-      void ** const table2{*reinterpret_cast<void ***>(factory2)};
-      ok = ok and patch(table2, 15, reinterpret_cast<void *>(&hook_create_hwnd), reinterpret_cast<void **>(&orig_create_hwnd));
-      factory2->Release();
-      }
-    factory->Release();
-    log_line(ok ? "hook: the DXGI factory's CreateSwapChain and CreateSwapChainForHwnd, waiting for the game's swap chain"
-                : "hook: the DXGI factory could not be hooked; nothing is changed");
-    return 0;
+    else
+      log_line("hook: no DXGI factory from the device; nothing is changed");
+    for(IUnknown * u: std::initializer_list<IUnknown *>{factory, adapter, dxgi_device})
+      if(u)
+        u->Release();
     }
 
   auto start() -> void
@@ -637,22 +647,90 @@ namespace
       CoTaskMemFree(local);
       }
     look_at_files();
-    install(nullptr);
+    hook_at_start = settings.hook >= 0.5f;
+    if(not hook_at_start)
+      log_line("hook: wings_hook = 0: nothing is hooked this session (the calls only passed on)");
     }
 
-  DWORD WINAPI start_thread(LPVOID)
+  INIT_ONCE start_once = INIT_ONCE_STATIC_INIT;
+
+  ///\brief the start, once, at the game's first device (not under the loader lock), never letting anything out
+  auto start_once_caught() noexcept -> void
     {
+    InitOnceExecuteOnce(
+      &start_once,
+      [](PINIT_ONCE, PVOID, PVOID *) -> BOOL
+        {
+        __try
+          {
+          [] { try { start(); } catch(...) { log_line("start: an exception; nothing is hooked"); hook_at_start = false; } }();
+          }
+        __except(EXCEPTION_EXECUTE_HANDLER)
+          {
+          hook_at_start = false;
+          }
+        return TRUE;
+        },
+      nullptr, nullptr);
+    }
+
+  ///\brief the next d3d11 of edloader's chain: d3d11.dll by name is edloader, which takes it on to the element after
+  /// this one (or the system's d3d11 without edloader)
+  template<typename F>
+  auto next(char const * name) noexcept -> F
+    {
+    HMODULE const d3d11{LoadLibraryW(L"d3d11.dll")};
+    return d3d11 ? reinterpret_cast<F>(GetProcAddress(d3d11, name)) : nullptr;
+    }
+
+  auto hook_device_caught(ID3D11Device * device, IDXGISwapChain * chain) noexcept -> void
+    {
+    if(not hook_at_start)
+      return;
     __try
       {
-      [] { try { start(); } catch(...) { log_line("start: an exception; nothing is changed"); } }();
+      hook_factory_of(device);
+      if(chain)
+        hook_chain(chain);
       }
     __except(EXCEPTION_EXECUTE_HANDLER)
       {
-      log_line("start: a fault; nothing is changed");
+      log_line("hook: a fault while hooking; nothing more is hooked");
+      hook_at_start = false;
       }
-    return 0;
     }
   }  // namespace
+
+// the chain element's two calls (exported as D3D11CreateDevice and D3D11CreateDeviceAndSwapChain, CMakeLists.txt):
+// passed on first, the factory hooked on the device they made, before the game can make its swap chain
+extern "C" HRESULT WINAPI edwide_create_device(IDXGIAdapter * adapter, D3D_DRIVER_TYPE type, HMODULE software, UINT flags,
+                                               D3D_FEATURE_LEVEL const * levels, UINT count, UINT version, ID3D11Device ** device,
+                                               D3D_FEATURE_LEVEL * level, ID3D11DeviceContext ** ctx)
+  {
+  start_once_caught();
+  auto const call{next<PFN_D3D11_CREATE_DEVICE>("D3D11CreateDevice")};
+  if(not call)
+    return E_FAIL;
+  HRESULT const hr{call(adapter, type, software, flags, levels, count, version, device, level, ctx)};
+  if(SUCCEEDED(hr) and device and *device)
+    hook_device_caught(*device, nullptr);
+  return hr;
+  }
+
+extern "C" HRESULT WINAPI edwide_create_device_and_chain(IDXGIAdapter * adapter, D3D_DRIVER_TYPE type, HMODULE software, UINT flags,
+                                                         D3D_FEATURE_LEVEL const * levels, UINT count, UINT version,
+                                                         DXGI_SWAP_CHAIN_DESC const * desc, IDXGISwapChain ** chain, ID3D11Device ** device,
+                                                         D3D_FEATURE_LEVEL * level, ID3D11DeviceContext ** ctx)
+  {
+  start_once_caught();
+  auto const call{next<PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN>("D3D11CreateDeviceAndSwapChain")};
+  if(not call)
+    return E_FAIL;
+  HRESULT const hr{call(adapter, type, software, flags, levels, count, version, desc, chain, device, level, ctx)};
+  if(SUCCEEDED(hr) and device and *device)
+    hook_device_caught(*device, chain ? *chain : nullptr);
+  return hr;
+  }
 
 ///\brief for the test: 1 once a swap chain's Present is hooked
 extern "C" __declspec(dllexport) auto edwide_screen_hooked() -> int
@@ -666,9 +744,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     {
     self = instance;
     DisableThreadLibraryCalls(instance);
-    // nothing under the loader lock: the start (files, the hook's swap chain) on a thread of its own
-    if(HANDLE const t{CreateThread(nullptr, 0, start_thread, nullptr, 0, nullptr)})
-      CloseHandle(t);
+    // nothing under the loader lock: the start comes with the game's first D3D11CreateDevice through this element
     }
   return TRUE;
   }

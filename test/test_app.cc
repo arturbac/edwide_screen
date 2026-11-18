@@ -177,14 +177,15 @@ auto main() -> int
   {
   SetEnvironmentVariableW(L"EDLOADER_CONFIG_DIR", L".");
   SetEnvironmentVariableW(L"EDLOADER_LOG_DIR", L".");
-  write_ini("wings = 1\nwings_angle = 30\nwings_center_px = 480\nwings_side_px = 240\nwings_fov = 60\n");
+  // EDWIDE_TEST_NOHOOK (tools/test.sh's second run): wings_hook 0, nothing hooked, the picture as it was
+  bool const no_hook{GetEnvironmentVariableW(L"EDWIDE_TEST_NOHOOK", nullptr, 0) != 0};
+  write_ini(no_hook ? "wings = 1\nwings_hook = 0\nwings_angle = 30\nwings_center_px = 480\nwings_side_px = 240\nwings_fov = 60\n"
+                    : "wings = 1\nwings_angle = 30\nwings_center_px = 480\nwings_side_px = 240\nwings_fov = 60\n");
   HMODULE const plugin{LoadLibraryW(L"edwide_screen.dll")};
   check(plugin != nullptr, "the plugin loaded");
   if(not plugin)
     return 1;
   auto const hooked{reinterpret_cast<int (*)()>(GetProcAddress(plugin, "edwide_screen_hooked"))};
-  // the factory hooked within a moment of loading (the plugin's thread); the swap chain made after it is hooked
-  Sleep(500);
 
   app_t a{};
   a.width = 960;
@@ -206,12 +207,39 @@ auto main() -> int
   sd.OutputWindow = window;
   sd.Windowed = TRUE;
   sd.SwapEffect = DXGI_SWAP_EFFECT_SEQUENTIAL;  // the picture kept after Present, to be read back
-  HRESULT const hr{D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &sd, &a.chain,
-                                                 &a.device, nullptr, &a.ctx)};
+  // as the game through edloader: the device by the element's D3D11CreateDevice (on to the system's d3d11 here), the
+  // swap chain by the device's factory, as Elite Dangerous makes it
+  auto const create_device{reinterpret_cast<PFN_D3D11_CREATE_DEVICE>(GetProcAddress(plugin, "D3D11CreateDevice"))};
+  check(create_device != nullptr, "the plugin exports D3D11CreateDevice (a chain element)");
+  HRESULT hr{create_device ? create_device(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &a.device, nullptr,
+                                           &a.ctx)
+                           : E_FAIL};
+  if(SUCCEEDED(hr))
+    {
+    IDXGIDevice * dxgi_device{};
+    IDXGIAdapter * adapter{};
+    IDXGIFactory * factory{};
+    a.device->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void **>(&dxgi_device));
+    if(dxgi_device)
+      dxgi_device->GetAdapter(&adapter);
+    if(adapter)
+      adapter->GetParent(__uuidof(IDXGIFactory), reinterpret_cast<void **>(&factory));
+    hr = factory ? factory->CreateSwapChain(a.device, &sd, &a.chain) : E_FAIL;
+    for(IUnknown * u: std::initializer_list<IUnknown *>{factory, adapter, dxgi_device})
+      if(u)
+        u->Release();
+    }
   check(SUCCEEDED(hr) and a.chain, "the test's swap chain made");
   if(FAILED(hr) or not a.chain)
     return 1;
-  check(hooked and hooked(), "the swap chain's Present hooked (through the DXGI factory)");
+  if(no_hook)
+    {
+    check(hooked and not hooked(), "wings_hook 0: nothing hooked");
+    check(same(present(a), pattern(a.width, a.height), 0), "wings_hook 0: the picture as it was");
+    std::printf(failures ? "FAILED (%d failure(s))\n" : "PASSED (%d failure(s))\n", failures);
+    return failures ? 1 : 0;
+    }
+  check(hooked and hooked(), "the swap chain's Present hooked (through the device's DXGI factory)");
 
   std::vector<std::uint32_t> const plain{pattern(a.width, a.height)};
   std::vector<std::uint32_t> const turned{present(a)};

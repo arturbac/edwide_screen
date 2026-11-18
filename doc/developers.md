@@ -2,14 +2,19 @@
 
 ## How it works
 
-- `src/plugin.cc`: `DllMain` only starts a thread. The thread opens the log and the ini (edloader's
-  `EDLOADER_LOG_DIR`, `EDLOADER_CONFIG_DIR`; without edloader the dll's folder), makes a DXGI factory (`dxgi.dll` by
-  name, `CreateDXGIFactory1`) and puts hooks into its table of methods: `CreateSwapChain` (slot 10) and
-  `CreateSwapChainForHwnd` (slot 15 of `IDXGIFactory2`). The game's factory is of the same class (Windows' dxgi,
-  DXVK's), so the swap chain it makes comes through them; its table then gets `Present` (slot 8) and `Present1` (slot
-  22 of `IDXGISwapChain1`). No device and no window of its own (the first version made a probe device and swap chain
-  of the system's d3d11 beside the game's: with EDHM in the list the game ended at its start). A swap chain made
-  before the factory is hooked is not followed (nothing changes; the log has no "hook: Present" line).
+- `src/plugin.cc`: a small chain element of edloader's. It exports `D3D11CreateDevice` and
+  `D3D11CreateDeviceAndSwapChain` (CMakeLists.txt's `/EXPORT`); `DllMain` does nothing. The game's first call opens
+  the log and the ini (edloader's `EDLOADER_LOG_DIR`, `EDLOADER_CONFIG_DIR`; without edloader the dll's folder), then
+  is passed on to `d3d11.dll` by name (edloader, which takes it to the next element, or the system's copy). On the
+  device made it takes the DXGI factory (`IDXGIDevice` → adapter → parent) and puts hooks into its table of methods:
+  `CreateSwapChain` (slot 10) and `CreateSwapChainForHwnd` (slot 15 of `IDXGIFactory2`). The game's factory is of the
+  same class (Windows' dxgi, DXVK's), so the swap chain it makes after its device comes through them (one made by
+  `D3D11CreateDeviceAndSwapChain` is hooked at once); its table then gets `Present` (slot 8) and `Present1` (slot 22
+  of `IDXGISwapChain1`). No thread, no device, no factory and no window of its own: the first version's probe device
+  ended the game at its start with EDHM in the list; the second's factory made on a thread of its own lost the race
+  with the game's swap chain now and then, and EDHM's colours went wrong with it in the list.
+- `wings_hook = 0` (read at the start): the calls only passed on, nothing hooked, to tell whether another mod is
+  disturbed by the hook or by the dll being there.
 - In the hook, before the original: the ini and the game's `Settings.xml` (`<FOV>`) looked at at most once a second;
   the device from the swap chain, its picture (buffer 0), the layout checked against the picture's size; then the
   whole state of the context set aside (`SwapDeviceContextState` with a state object of its own), the picture copied

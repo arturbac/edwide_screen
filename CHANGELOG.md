@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A small element of edloader's chain: the factory hooked in the game's own `D3D11CreateDevice`, after the device is
+  made, with no thread of its own (that thread lost the race with the game's swap chain now and then, and EDHM's
+  colours went wrong with it). Put it before EDHM in the list. `wings_hook = 0` to tell whether the hook disturbs
+  another mod.
 - `wings_calibrate` (instead of `wings_guides`): circles, squares and rows across the edges of the middle monitor, to
   set `wings_angle` by; users.md says which way to turn it.
 - The hook through the DXGI factory, no device of its own: the first version's probe device and swap chain beside the

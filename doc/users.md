@@ -3,8 +3,9 @@
 ## Install
 
 1. edloader installed (the game's `d3d11.dll`), with its folder `%USERPROFILE%\edloader`.
-2. `edwide_screen.dll` into `edloader\plugins`, and a line `edwide_screen.dll` in `edloader\edloader.txt`. It is not
-   a d3d11 proxy, so its place in the list does not matter.
+2. `edwide_screen.dll` into `edloader\plugins`, and a line `edwide_screen.dll` in `edloader\edloader.txt`, before
+   EDHM's line if EDHM is in the list. It is a small element of the list: it passes the game's call on and only
+   hooks the picture's showing.
 3. Start the game once: `edloader\config\edwide_screen.ini` is made, every line a comment, and the correction is off.
 
 ## Set it
@@ -25,6 +26,7 @@ In `edwide_screen.ini` (a line without `;` sets a value; read again within a sec
 | `wings_curve` | `0` | `0` flat side monitors .. `1` curved |
 | `wings_offset_y` | `0` | the sides moved down (+) or up (-), pixels |
 | `wings_calibrate` | `0` | `1` = the calibration's shapes (below); `0` = none |
+| `wings_hook` | `1` | read when the game starts: `0` = nothing hooked (only to tell whether another mod is disturbed by it) |
 
 Measure: the angle from the monitors' widths and the distance between the outer edges (three monitors of width `w`,
 the outer edges `e` apart: `cos(angle) = (e - w) / (2 w)`), your eyes' distance from the middle monitor, its picture

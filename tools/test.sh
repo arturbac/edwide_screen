@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # edwide_screen's test without the game: test/test_app.cc under wine (wine's own d3d11) with the plugin beside it.
 # Leaves the pictures grid.bmp (as the game gives it), grid_30.bmp (corrected at 30 degrees) and calibrate_20.bmp,
-# calibrate_30.bmp, calibrate_40.bmp (the calibration's shapes at three angles) in the run directory, to look at.
+# calibrate_30.bmp, calibrate_40.bmp (the calibration's shapes at three angles) in the run directory, to look at; a
+# second run in no_hook/ with wings_hook = 0.
 # Usage: tools/test.sh <build dir> <scratch dir>; environment: EDWIDE_WINEPREFIX (a wine prefix kept between runs)
 set -euo pipefail
 BUILD=$(cd "${1:?build dir}" && pwd)
@@ -16,6 +17,10 @@ cp "$BUILD/edwide_screen.dll" "$BUILD/edwide_test.exe" "$RUN/"
 set +e
 (cd "$RUN" && WINEDEBUG=-all wine edwide_test.exe > out.txt 2>&1)
 rc=$?
+# a second run with wings_hook = 0: nothing hooked, the picture as it was
+mkdir "$RUN/no_hook"
+cp "$BUILD/edwide_screen.dll" "$BUILD/edwide_test.exe" "$RUN/no_hook/"
+(cd "$RUN/no_hook" && EDWIDE_TEST_NOHOOK=1 WINEDEBUG=-all wine edwide_test.exe >> ../out.txt 2>&1) || rc=1
 set -e
 cat "$RUN/out.txt"
 echo "--- the plugin's log and the pictures in $RUN"
