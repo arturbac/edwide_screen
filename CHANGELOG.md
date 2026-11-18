@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-beta.1
 
 - A small element of edloader's chain: the factory hooked in the game's own `D3D11CreateDevice`, after the device is
   made, with no thread of its own (that thread lost the race with the game's swap chain now and then, and EDHM's
