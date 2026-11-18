@@ -541,66 +541,83 @@ namespace
     return true;
     }
 
-  ///\brief a swap chain of the system's own d3d11 on a hidden window, only for its table of methods: the game's is of
-  /// the same class (Windows' dxgi, DXVK's), so its Present comes through the hook. The system copy by its path, not
-  /// d3d11.dll by name (that is edloader: its chain, edworld, would take this device for the game's)
-  DWORD WINAPI install(LPVOID)
+  // ---- the hook put in place: through the DXGI factory, no device of its own (2026-11-18: a probe device and swap chain
+  // of the system's d3d11 made beside the game's ended the game at its start, with EDHM in edloader's list) ----
+  using create_chain_fn = HRESULT(STDMETHODCALLTYPE *)(IDXGIFactory *, IUnknown *, DXGI_SWAP_CHAIN_DESC *, IDXGISwapChain **);
+  using create_hwnd_fn = HRESULT(STDMETHODCALLTYPE *)(IDXGIFactory2 *, IUnknown *, HWND, DXGI_SWAP_CHAIN_DESC1 const *,
+                                                      DXGI_SWAP_CHAIN_FULLSCREEN_DESC const *, IDXGIOutput *, IDXGISwapChain1 **);
+  create_chain_fn orig_create_chain{};
+  create_hwnd_fn orig_create_hwnd{};
+  SRWLOCK chain_lock = SRWLOCK_INIT;
+
+  ///\brief a swap chain the game made: Present and Present1 hooked in its table, once a table
+  auto hook_chain(IDXGISwapChain * chain) noexcept -> void
     {
-    wchar_t sys[MAX_PATH]{};
-    GetSystemDirectoryW(sys, MAX_PATH);
-    // EDWIDE_PROBE_BY_NAME (tools/bench.sh only, no edloader there): d3d11.dll by name, the DXVK copy beside the test
-    bool const by_name{GetEnvironmentVariableW(L"EDWIDE_PROBE_BY_NAME", nullptr, 0) != 0};
-    HMODULE const system_d3d11{LoadLibraryW(by_name ? L"d3d11.dll" : (std::wstring{sys} + L"\\d3d11.dll").c_str())};
-    auto const create{system_d3d11 ? reinterpret_cast<PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN>(
-                                       GetProcAddress(system_d3d11, "D3D11CreateDeviceAndSwapChain"))
-                                   : nullptr};
-    WNDCLASSEXW wc{};
-    wc.cbSize = sizeof wc;
-    wc.lpfnWndProc = DefWindowProcW;
-    wc.hInstance = self;
-    wc.lpszClassName = L"edwide_screen_probe";
-    RegisterClassExW(&wc);
-    HWND const window{CreateWindowExW(0, wc.lpszClassName, L"edwide_screen", WS_OVERLAPPEDWINDOW, 0, 0, 64, 64, nullptr, nullptr, self, nullptr)};
-    DXGI_SWAP_CHAIN_DESC sd{};
-    sd.BufferDesc.Width = 64;
-    sd.BufferDesc.Height = 64;
-    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.SampleDesc.Count = 1;
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.BufferCount = 2;
-    sd.OutputWindow = window;
-    sd.Windowed = TRUE;
-    sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    IDXGISwapChain * chain{};
-    ID3D11Device * device{};
-    ID3D11DeviceContext * ctx{};
-    HRESULT const hr{create and window ? create(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &sd, &chain,
-                                               &device, nullptr, &ctx)
-                                       : E_FAIL};
-    if(SUCCEEDED(hr) and chain)
+    if(not chain)
+      return;
+    AcquireSRWLockExclusive(&chain_lock);
+    void ** const table{*reinterpret_cast<void ***>(chain)};
+    if(table[8] != reinterpret_cast<void *>(&hook_present))
       {
-      void ** const table{*reinterpret_cast<void ***>(chain)};
       bool ok{patch(table, 8, reinterpret_cast<void *>(&hook_present), reinterpret_cast<void **>(&orig_present))};
       IDXGISwapChain1 * chain1{};
       if(SUCCEEDED(chain->QueryInterface(__uuidof(IDXGISwapChain1), reinterpret_cast<void **>(&chain1))) and chain1)
         {
         void ** const table1{*reinterpret_cast<void ***>(chain1)};
-        ok = ok and patch(table1, 22, reinterpret_cast<void *>(&hook_present1), reinterpret_cast<void **>(&orig_present1));
+        if(table1[22] != reinterpret_cast<void *>(&hook_present1))
+          ok = ok and patch(table1, 22, reinterpret_cast<void *>(&hook_present1), reinterpret_cast<void **>(&orig_present1));
         chain1->Release();
         }
-      log_line(ok ? "hook: Present in the swap chains' table (the system's d3d11)" : "hook: Present could not be hooked; nothing is changed");
+      log_line(ok ? "hook: Present of the game's swap chain" : "hook: the game's Present could not be hooked; nothing is changed");
       hooked.store(ok);
       }
-    else
-      log_line("hook: no swap chain to take the table from (hr 0x%08lX); nothing is changed", static_cast<unsigned long>(hr));
-    if(ctx)
-      ctx->Release();
-    if(chain)
-      chain->Release();
-    if(device)
-      device->Release();
-    if(window)
-      DestroyWindow(window);
+    ReleaseSRWLockExclusive(&chain_lock);
+    }
+
+  HRESULT STDMETHODCALLTYPE hook_create_chain(IDXGIFactory * factory, IUnknown * device, DXGI_SWAP_CHAIN_DESC * desc, IDXGISwapChain ** out)
+    {
+    HRESULT const hr{orig_create_chain(factory, device, desc, out)};
+    if(SUCCEEDED(hr) and out)
+      hook_chain(*out);
+    return hr;
+    }
+
+  HRESULT STDMETHODCALLTYPE hook_create_hwnd(IDXGIFactory2 * factory, IUnknown * device, HWND window, DXGI_SWAP_CHAIN_DESC1 const * desc,
+                                             DXGI_SWAP_CHAIN_FULLSCREEN_DESC const * full, IDXGIOutput * output, IDXGISwapChain1 ** out)
+    {
+    HRESULT const hr{orig_create_hwnd(factory, device, window, desc, full, output, out)};
+    if(SUCCEEDED(hr) and out)
+      hook_chain(*out);
+    return hr;
+    }
+
+  ///\brief a DXGI factory, only for its table of methods: the game's factory is of the same class (Windows' dxgi,
+  /// DXVK's), so the swap chain it makes comes through CreateSwapChain or CreateSwapChainForHwnd, whose Present is then
+  /// hooked. No device and no window of its own
+  DWORD WINAPI install(LPVOID)
+    {
+    HMODULE const dxgi{LoadLibraryW(L"dxgi.dll")};
+    using factory_fn = HRESULT(WINAPI *)(REFIID, void **);
+    auto const create{dxgi ? reinterpret_cast<factory_fn>(GetProcAddress(dxgi, "CreateDXGIFactory1")) : nullptr};
+    IDXGIFactory1 * factory{};
+    HRESULT const hr{create ? create(__uuidof(IDXGIFactory1), reinterpret_cast<void **>(&factory)) : E_FAIL};
+    if(FAILED(hr) or not factory)
+      {
+      log_line("hook: no DXGI factory (hr 0x%08lX); nothing is changed", static_cast<unsigned long>(hr));
+      return 0;
+      }
+    void ** const table{*reinterpret_cast<void ***>(factory)};
+    bool ok{patch(table, 10, reinterpret_cast<void *>(&hook_create_chain), reinterpret_cast<void **>(&orig_create_chain))};
+    IDXGIFactory2 * factory2{};
+    if(SUCCEEDED(factory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void **>(&factory2))) and factory2)
+      {
+      void ** const table2{*reinterpret_cast<void ***>(factory2)};
+      ok = ok and patch(table2, 15, reinterpret_cast<void *>(&hook_create_hwnd), reinterpret_cast<void **>(&orig_create_hwnd));
+      factory2->Release();
+      }
+    factory->Release();
+    log_line(ok ? "hook: the DXGI factory's CreateSwapChain and CreateSwapChainForHwnd, waiting for the game's swap chain"
+                : "hook: the DXGI factory could not be hooked; nothing is changed");
     return 0;
     }
 
@@ -637,7 +654,7 @@ namespace
     }
   }  // namespace
 
-///\brief for the test: 1 once Present is hooked
+///\brief for the test: 1 once a swap chain's Present is hooked
 extern "C" __declspec(dllexport) auto edwide_screen_hooked() -> int
   {
   return hooked.load() ? 1 : 0;

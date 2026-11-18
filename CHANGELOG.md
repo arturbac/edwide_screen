@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The hook through the DXGI factory, no device of its own: the first version's probe device and swap chain beside the
+  game's ended the game at its start (with EDHM in edloader's list).
 - `wings_eye_cm` and `wings_center_cm`: the sides laid as seen from your eyes' distance; the game's field of view is
   used only without them (it put the eyes at ~41 cm for 58 degrees at 9000x2160, so the sides were turned too much
   for eyes 80 cm away).

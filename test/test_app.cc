@@ -183,9 +183,8 @@ auto main() -> int
   if(not plugin)
     return 1;
   auto const hooked{reinterpret_cast<int (*)()>(GetProcAddress(plugin, "edwide_screen_hooked"))};
-  for(int i{}; hooked and i != 100 and not hooked(); ++i)
-    Sleep(50);
-  check(hooked and hooked(), "Present hooked");
+  // the factory hooked within a moment of loading (the plugin's thread); the swap chain made after it is hooked
+  Sleep(500);
 
   app_t a{};
   a.width = 960;
@@ -212,6 +211,7 @@ auto main() -> int
   check(SUCCEEDED(hr) and a.chain, "the test's swap chain made");
   if(FAILED(hr) or not a.chain)
     return 1;
+  check(hooked and hooked(), "the swap chain's Present hooked (through the DXGI factory)");
 
   std::vector<std::uint32_t> const plain{pattern(a.width, a.height)};
   std::vector<std::uint32_t> const turned{present(a)};

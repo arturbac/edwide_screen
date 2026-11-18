@@ -3,11 +3,13 @@
 ## How it works
 
 - `src/plugin.cc`: `DllMain` only starts a thread. The thread opens the log and the ini (edloader's
-  `EDLOADER_LOG_DIR`, `EDLOADER_CONFIG_DIR`; without edloader the dll's folder), then makes a swap chain of the
-  system's own d3d11 (by its path, not `d3d11.dll` by name, which is edloader: its chain would take the device for the
-  game's) on a hidden window, and puts its hooks into that swap chain's table of methods: `Present` (slot 8) and
-  `Present1` (slot 22 of `IDXGISwapChain1`). The game's swap chain is of the same class (Windows' dxgi, DXVK's), so
-  it comes through the hooks. `EDWIDE_PROBE_BY_NAME` (the bench only) takes `d3d11.dll` by name.
+  `EDLOADER_LOG_DIR`, `EDLOADER_CONFIG_DIR`; without edloader the dll's folder), makes a DXGI factory (`dxgi.dll` by
+  name, `CreateDXGIFactory1`) and puts hooks into its table of methods: `CreateSwapChain` (slot 10) and
+  `CreateSwapChainForHwnd` (slot 15 of `IDXGIFactory2`). The game's factory is of the same class (Windows' dxgi,
+  DXVK's), so the swap chain it makes comes through them; its table then gets `Present` (slot 8) and `Present1` (slot
+  22 of `IDXGISwapChain1`). No device and no window of its own (the first version made a probe device and swap chain
+  of the system's d3d11 beside the game's: with EDHM in the list the game ended at its start). A swap chain made
+  before the factory is hooked is not followed (nothing changes; the log has no "hook: Present" line).
 - In the hook, before the original: the ini and the game's `Settings.xml` (`<FOV>`) looked at at most once a second;
   the device from the swap chain, its picture (buffer 0), the layout checked against the picture's size; then the
   whole state of the context set aside (`SwapDeviceContextState` with a state object of its own), the picture copied
