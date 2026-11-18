@@ -293,13 +293,24 @@ auto main() -> int
   check(not same(present(a), plain, 1), "960x240 again: the sides corrected again");
   check(read_log().find("on again: the picture 960x240") != std::string::npos, "the log says it is on again");
 
-  // pictures for a person: the grid as the game gives it, corrected at 30 degrees, and with the guides
+  // pictures for a person: the grid as the game gives it, corrected at 30 degrees
   std::vector<std::uint32_t> const lines{grid(a.width, a.height)};
   write_bmp("grid.bmp", lines, a.width, a.height);
   write_bmp("grid_30.bmp", present(a, &lines), a.width, a.height);
-  write_ini("wings = 1\nwings_angle = 30\nwings_center_px = 480\nwings_side_px = 240\nwings_fov = 60\nwings_guides = 1\n");
-  (void)present(a, &lines);
-  write_bmp("grid_30_guides.bmp", present(a, &lines), a.width, a.height);
+  // the calibration: at three angles, to see how the shapes on the sides change with it
+  for(int angle: {20, 30, 40})
+    {
+    char ini[192], name[64];
+    std::snprintf(ini, sizeof ini, "wings = 1\nwings_angle = %d\nwings_center_px = 480\nwings_side_px = 240\nwings_fov = 60\nwings_calibrate = 1\n", angle);
+    write_ini(ini);
+    (void)present(a, &lines);
+    std::snprintf(name, sizeof name, "calibrate_%d.bmp", angle);
+    write_bmp(name, present(a, &lines), a.width, a.height);
+    }
+  // wings_calibrate 0 again: nothing of it left
+  write_ini("wings = 1\nwings_angle = 30\nwings_center_px = 480\nwings_side_px = 240\nwings_fov = 60\nwings_calibrate = 0\n");
+  (void)present(a);
+  check(same(present(a), turned, 0), "wings_calibrate 0: the corrected picture without the shapes");
 
   // EDWIDE_BENCH=<width>x<height> (tools/bench.sh): the correction's time on the graphics card at that size, the
   // frame's time with it on less the time with it off, the median of 100 frames each

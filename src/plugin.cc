@@ -105,7 +105,7 @@ namespace
     float zoom{1.f};
     float curve{0.f};
     float offset_y{0.f};
-    float guides{0.f};
+    float calibrate{0.f};
     };
 
   struct key_t
@@ -127,7 +127,7 @@ namespace
     {"wings_zoom", &settings_t::zoom, "the sides' size: above 1 larger (less black at the corners, more cut off)"},
     {"wings_curve", &settings_t::curve, "0 flat side monitors .. 1 curved ones"},
     {"wings_offset_y", &settings_t::offset_y, "the sides moved up (-) or down (+), pixels"},
-    {"wings_guides", &settings_t::guides, "1 = guide lines to set the angle by eye: the picture's rows stay straight when it is right"},
+    {"wings_calibrate", &settings_t::calibrate, "1 = shapes to set the angle by: circles, squares and rows across the monitors' edges, round, square and straight from where you sit when wings_angle is right"},
   };
 
   settings_t settings{};
@@ -180,9 +180,9 @@ namespace
     s.angle = std::clamp(s.angle, -80.f, 80.f);
     settings = s;
     log_line("settings: wings %g, angle %g, centre %g px, side %g px, bezel %g px, eye %g cm, centre %g cm, fov %g, zoom %g, curve %g, "
-             "offset %g, guides %g",
+             "offset %g, calibrate %g",
              double(s.wings), double(s.angle), double(s.centre_px), double(s.side_px), double(s.bezel_px), double(s.eye_cm),
-             double(s.centre_cm), double(s.fov), double(s.zoom), double(s.curve), double(s.offset_y), double(s.guides));
+             double(s.centre_cm), double(s.fov), double(s.zoom), double(s.curve), double(s.offset_y), double(s.calibrate));
     }
 
   ///\brief the ini with every setting as a comment, when there is none
@@ -430,7 +430,7 @@ namespace
     float const a{settings.angle * 0.017453293f};
     float const constants[12]{static_cast<float>(d.Width), static_cast<float>(d.Height), 0.5f * settings.centre_px, settings.bezel_px,
                               plane, std::cos(a), std::sin(a), settings.curve,
-                              settings.zoom, settings.offset_y, settings.guides, 0.f};
+                              settings.zoom, settings.offset_y, settings.calibrate, 0.f};
     ID3D11DeviceContext * ctx{};
     device->GetImmediateContext(&ctx);
     ID3D11DeviceContext1 * ctx1{};

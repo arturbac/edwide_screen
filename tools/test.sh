@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # edwide_screen's test without the game: test/test_app.cc under wine (wine's own d3d11) with the plugin beside it.
-# Leaves the pictures grid.bmp (as the game gives it), grid_30.bmp (corrected at 30 degrees) and grid_30_guides.bmp
-# in the run directory, to look at.
+# Leaves the pictures grid.bmp (as the game gives it), grid_30.bmp (corrected at 30 degrees) and calibrate_20.bmp,
+# calibrate_30.bmp, calibrate_40.bmp (the calibration's shapes at three angles) in the run directory, to look at.
 # Usage: tools/test.sh <build dir> <scratch dir>; environment: EDWIDE_WINEPREFIX (a wine prefix kept between runs)
 set -euo pipefail
 BUILD=$(cd "${1:?build dir}" && pwd)

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `wings_calibrate` (instead of `wings_guides`): circles, squares and rows across the edges of the middle monitor, to
+  set `wings_angle` by; users.md says which way to turn it.
 - The hook through the DXGI factory, no device of its own: the first version's probe device and swap chain beside the
   game's ended the game at its start (with EDHM in edloader's list).
 - `wings_eye_cm` and `wings_center_cm`: the sides laid as seen from your eyes' distance; the game's field of view is

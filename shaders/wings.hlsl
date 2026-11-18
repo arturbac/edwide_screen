@@ -9,7 +9,7 @@ cbuffer wings : register(b0)
   {
   float4 size;    // width, height, half the middle monitor's width, the bezel (pixels of the picture)
   float4 turn;    // the picture plane's distance from the eye (pixels), cos and sin of the sides' angle, the curve 0..1
-  float4 adjust;  // zoom, vertical offset (pixels), guides 0/1, unused
+  float4 adjust;  // zoom, vertical offset (pixels), calibration 0/1, unused
   };
 
 struct vs_out
@@ -26,17 +26,53 @@ vs_out vs_main(uint id : SV_VertexID)
   return o;
   }
 
+// the calibration (wings_calibrate): shapes drawn into the game's picture before it is laid over the sides, as on the
+// middle monitor's plane carried on - on each hinge two circles (radius a quarter and an eighth of the height) and a
+// square (0.4 of the height), the picture's rows every eighth of the height, the eyes' level; seen from where the eyes
+// are, with the angle right, they are round, square and straight across the monitors' edges. at: the point of the
+// picture (pixels), width the line's width there
+float4 calibration(float2 at, float4 colour, float width, float height, float half_middle, float line_width)
+  {
+  float2 centre = float2(0.5f * width, 0.5f * height);
+  float step = height / 8.f;
+  float off_row = abs(frac(at.y / step + 0.5f) - 0.5f) * step;
+  if(off_row < line_width)
+    colour = float4(1.f, 0.f, 1.f, 1.f);
+  if(abs(at.y - centre.y) < line_width)
+    colour = float4(1.f, 1.f, 1.f, 1.f);
+  [unroll]
+  for(int k = 0; k != 2; ++k)
+    {
+    float2 hinge = float2(centre.x + (k == 0 ? -half_middle : half_middle), centre.y);
+    float2 off = at - hinge;
+    float distance = length(off);
+    if(abs(distance - 0.25f * height) < line_width || abs(distance - 0.125f * height) < line_width)
+      colour = float4(1.f, 0.85f, 0.f, 1.f);
+    float box = max(abs(off.x), abs(off.y));
+    if(abs(box - 0.2f * height) < line_width)
+      colour = float4(0.f, 1.f, 0.2f, 1.f);
+    }
+  return colour;
+  }
+
 float4 ps_main(vs_out input) : SV_TARGET
   {
   float width = size.x, height = size.y, half_middle = size.z, bezel = size.w;
   float d = turn.x, c = turn.y, s = turn.z, curve = turn.w;
   float zoom = adjust.x, offset = adjust.y;
+  bool calibrate = adjust.z > 0.5f;
   float u = input.pos.x - 0.5f * width;
   float v = input.pos.y - 0.5f * height;
   float side = u < 0.f ? -1.f : 1.f;
   float along = abs(u) - half_middle;  // from the hinge, along the side monitor
   if(along < 0.f)
-    return picture.Load(int3(input.pos.xy, 0));
+    {
+    float4 middle = picture.Load(int3(input.pos.xy, 0));
+    if(!calibrate)
+      return middle;
+    middle = calibration(input.pos.xy, middle, width, height, half_middle, 1.5f);
+    return -along < 2.f ? float4(0.f, 1.f, 1.f, 1.f) : middle;  // the hinge cyan
+    }
   if(along < bezel)  // behind the bezel: not seen
     return float4(0.f, 0.f, 0.f, 1.f);
   // the pixel on its monitor turned towards the eye about the hinge (flat), or on a cylinder about the eye (curved)
@@ -54,16 +90,13 @@ float4 ps_main(vs_out input) : SV_TARGET
   if(any(at < 0.f) || at.x >= width || at.y >= height)
     return float4(0.f, 0.f, 0.f, 1.f);
   float4 colour = picture.SampleLevel(linear_clamp, at / float2(width, height), 0.f);
-  if(adjust.z > 0.5f)
+  if(calibrate)
     {
-    // the guides: the hinge cyan, the picture's rows every eighth of the height magenta (straight on the monitor as the
-    // angle is right)
+    // the line as wide in the picture as a pixel and a half of the monitor there: the picture's pixels a monitor's pixel
+    float stretch = d / p.z / zoom;
+    colour = calibration(at, colour, width, height, half_middle, 1.5f * stretch);
     if(along - bezel < 2.f)
       colour = float4(0.f, 1.f, 1.f, 1.f);
-    float step = height / 8.f;
-    float off_row = abs(frac(at.y / step + 0.5f) - 0.5f) * step;  // pixels of the picture from the nearest row
-    if(off_row < 1.f / zoom)
-      colour = float4(1.f, 0.f, 1.f, 1.f);
     }
   return colour;
   }

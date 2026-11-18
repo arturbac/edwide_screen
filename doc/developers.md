@@ -37,6 +37,10 @@
   presents a picture 960x240 laid out as 480 + 2 x 240 with known colours and reads it back: the middle the same bits,
   each side's pixel the colour of where `wings_math.h` says it comes from (within 3 of 255), angle 0 and wings 0 change
   nothing, `ResizeBuffers` to another size is not refused and that size passes untouched with its log line, the right
-  size turns it on again. Leaves `grid.bmp`, `grid_30.bmp`, `grid_30_guides.bmp` to look at.
+  size turns it on again, `wings_calibrate = 0` leaves no trace of the shapes. Leaves `grid.bmp`, `grid_30.bmp` and
+  `calibrate_20/30/40.bmp` to look at.
+- The calibration (`calibration()` in the shader) is drawn in the picture's own pixels, before the sides are laid:
+  the shapes stand on the middle monitor's plane carried on, so they are right on the monitors exactly when the
+  angle and the eyes' distance are; the line is a pixel and a half of the monitor wide wherever it is.
 - `tools/bench.sh <build dir> <scratch> [w h]` (`EDWIDE_WINEPREFIX`, `EDWIDE_DXVK_DIR` with DXVK's d3d11.dll and
   dxgi.dll): a frame's time on the graphics card with the correction less without it, median of 100.

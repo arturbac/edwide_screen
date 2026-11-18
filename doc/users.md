@@ -24,7 +24,7 @@ In `edwide_screen.ini` (a line without `;` sets a value; read again within a sec
 | `wings_zoom` | `1` | the sides' size: above 1 larger (less black at the outer corners, more cut off) |
 | `wings_curve` | `0` | `0` flat side monitors .. `1` curved |
 | `wings_offset_y` | `0` | the sides moved down (+) or up (-), pixels |
-| `wings_guides` | `0` | `1` = guide lines: the hinge cyan, rows of the picture magenta |
+| `wings_calibrate` | `0` | `1` = the calibration's shapes (below); `0` = none |
 
 Measure: the angle from the monitors' widths and the distance between the outer edges (three monitors of width `w`,
 the outer edges `e` apart: `cos(angle) = (e - w) / (2 w)`), your eyes' distance from the middle monitor, its picture
@@ -44,8 +44,17 @@ The game's field of view does not change the correction once `wings_eye_cm` is s
 monitor as your eyes see it. For the middle itself to be true to your eyes too, the game's vertical field of view is
 `2 atan(height_px / 2 / (eye_cm x px_per_cm))` - 25 degrees in the example; a wider one shows more, as it does now.
 
-Then fine-tune the angle by eye: `wings_guides = 1`, then change `wings_angle` until the magenta rows run on from the middle
-monitor straight across the side monitors as you sit. Then `wings_guides = 0`.
+Then fine-tune the angle by eye with `wings_calibrate = 1`. On each edge between the middle monitor and a side one it
+draws two yellow circles and a green square, half on each monitor, as if they stood on the middle monitor carried on;
+magenta rows every eighth of the height, the white line at the eyes' level, the edges cyan. From where you sit, with
+the angle right, the circles are round, the square square and the rows run on straight across the edges. Change
+`wings_angle` in the ini a degree or two at a time (it is read again within a second; the log names each value):
+
+- the side half of a circle narrower than the middle half (squeezed): the angle is too large, make it smaller;
+- the side half wider (stretched): the angle is too small, make it larger;
+- no angle makes both round and straight at the edge: check `wings_eye_cm`.
+
+Then `wings_calibrate = 0`.
 
 Black at the outer corners: the game's picture does not reach that far for the angle; a larger `wings_zoom` fills it
 by cutting a little off, a larger field of view in the game draws more.
