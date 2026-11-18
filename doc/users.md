@@ -2,6 +2,8 @@
 
 ## Install
 
+Tried only on Linux (Proton, DXVK); on Windows it should work the same way, but nobody has tried that yet.
+
 1. edloader installed (the game's `d3d11.dll`), with its folder `%USERPROFILE%\edloader`.
 2. `edwide_screen.dll` into `edloader\plugins`, and a line `edwide_screen.dll` in `edloader\edloader.txt`, before
    EDHM's line if EDHM is in the list. It is a small element of the list: it passes the game's call on and only
@@ -57,6 +59,11 @@ the angle right, the circles are round, the square square and the rows run on st
 - no angle makes both round and straight at the edge: check `wings_eye_cm`.
 
 Then `wings_calibrate = 0`.
+
+![The calibration's shapes on three monitors](images/calibration.jpg)
+
+The angle measured is where to start, not always where it ends: on the setup of the example (measured 41.4) the
+shapes looked right at `wings_angle = 16`.
 
 Black at the outer corners: the game's picture does not reach that far for the angle; a larger `wings_zoom` fills it
 by cutting a little off, a larger field of view in the game draws more.

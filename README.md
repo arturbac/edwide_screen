@@ -17,6 +17,26 @@ across the monitor's edge.
   alone, and it comes back on by itself when the size is right again.
 - Cost on the graphics card: about 0.1 ms a frame at 9000x2160 (RX 7900 XTX, DXVK).
 
-How to set it up: [doc/users.md](doc/users.md). How it works: [doc/developers.md](doc/developers.md).
+![The calibration's shapes on three monitors](doc/images/calibration.jpg)
+
+*`wings_calibrate = 1`: circles, squares and rows across the edges of the middle monitor, to set the angle by
+(a screenshot of the whole picture, as the game shows it over the three monitors).*
+
+## Where it is tried
+
+Built and tried only on Linux: Elite Dangerous Odyssey under Proton (DXVK), three 4K monitors with the game's
+picture 9000x2160 across them, edloader with EDHM and edworld in its list. It is a plain Windows dll for the game's
+DirectX 11, so it should work on Windows the same way, but nobody has tried that yet.
+
+## Use
+
+1. Install edloader, put `edwide_screen.dll` into `edloader\plugins` and a line `edwide_screen.dll` into
+   `edloader\edloader.txt` (before EDHM's line).
+2. Start the game once, then in `edloader\config\edwide_screen.ini` set the monitors' widths in pixels, your eyes'
+   distance and the middle monitor's width in cm, the angle measured, `wings = 1`.
+3. `wings_calibrate = 1`, change `wings_angle` in the ini until the circles look round from where you sit (each
+   save shows within a second), then `wings_calibrate = 0`.
+
+How to set it up in full: [doc/users.md](doc/users.md). How it works: [doc/developers.md](doc/developers.md).
 
 License: MIT ([LICENSE](LICENSE)).
