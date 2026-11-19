@@ -175,12 +175,12 @@ namespace edwide
     float const expected{settings.centre_px + 2.f * (side + settings.bezel_px)};
     if(settings.side_px > 0.f and std::fabs(expected - static_cast<float>(d.Width)) > 0.5f)
       {
-      std::snprintf(why, sizeof why, "the picture is %ux%u, the settings expect a width of %.0f", d.Width, d.Height, double(expected));
+      format_into(why, "the picture is {}x{}, the settings expect a width of {:.0f}", d.Width, d.Height, double(expected));
       return tell(state_e::off_size, d.Width, d.Height, why);
       }
     if(side <= 0.f)
       {
-      std::snprintf(why, sizeof why, "the picture is %ux%u, no room for the sides beside a middle of %.0f", d.Width, d.Height,
+      format_into(why, "the picture is {}x{}, no room for the sides beside a middle of {:.0f}", d.Width, d.Height,
                     double(settings.centre_px));
       return tell(state_e::off_size, d.Width, d.Height, why);
       }

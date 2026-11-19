@@ -198,7 +198,7 @@ namespace edwide
     for(key_t const & k: keys)
       {
       char line[256];
-      std::snprintf(line, sizeof line, "; %s\r\n;%s = %g\r\n", k.help, k.name, double(d.*k.field));
+      format_into(line, "; {}\r\n;{} = {:g}\r\n", k.help, k.name, double(d.*k.field));
       text += line;
       }
     HANDLE const f{CreateFileW(ini_path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
