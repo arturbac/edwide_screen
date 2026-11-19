@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The source split by topic (`src/*.cc` with headers, namespace `edwide`) out of one `plugin.cc`; nothing changed in
+  what it does.
+
 ## 1.0.0-beta.1
 
 - A small element of edloader's chain: the factory hooked in the game's own `D3D11CreateDevice`, after the device is

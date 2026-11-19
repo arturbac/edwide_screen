@@ -50,7 +50,7 @@ add_custom_target(edwide_version
   COMMENT "edwide_screen version")
 add_custom_target(edwide_generated DEPENDS "${gen}/wings_vs.h" "${gen}/wings_ps.h")
 
-add_library(edwide_screen SHARED src/plugin.cc)
+add_library(edwide_screen SHARED src/entry.cc src/settings_log.cc src/correction.cc src/hooks.cc)
 target_include_directories(edwide_screen PRIVATE "${gen}")
 target_link_libraries(edwide_screen PRIVATE kernel32 user32 d3d11 dxgi dxguid)
 target_compile_definitions(edwide_screen PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)

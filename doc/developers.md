@@ -2,7 +2,12 @@
 
 ## How it works
 
-- `src/plugin.cc`: a small chain element of edloader's. It exports `D3D11CreateDevice` and
+The sources in `src/`, namespace `edwide`, each topic a `.cc` with its header of what the others use: `runtime.h`
+(the log, the settings, the game's field of view, in `settings_log.cc`), `correction` (the side parts laid over at
+each Present; `wings_math.h` its geometry), `hooks` (Present and the DXGI factory), and `entry.cc` (the exports, the
+start, `DllMain`).
+
+- `src/entry.cc`: a small chain element of edloader's. It exports `D3D11CreateDevice` and
   `D3D11CreateDeviceAndSwapChain` (CMakeLists.txt's `/EXPORT`); `DllMain` does nothing. The game's first call opens
   the log and the ini (edloader's `EDLOADER_LOG_DIR`, `EDLOADER_CONFIG_DIR`; without edloader the dll's folder), then
   is passed on to `d3d11.dll` by name (edloader, which takes it to the next element, or the system's copy). On the
