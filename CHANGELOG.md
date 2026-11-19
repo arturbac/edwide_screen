@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The log through `std::format` (checked when compiled; wide strings as UTF-8) in place of printf's `va_list`; the SRW
+  locks held by scope objects.
 - The source split by topic (`src/*.cc` with headers, namespace `edwide`) out of one `plugin.cc`; nothing changed in
   what it does.
 

@@ -59,7 +59,7 @@ namespace edwide
     {
     if(not chain)
       return;
-    AcquireSRWLockExclusive(&chain_lock);
+    exclusive_lock_t const hold{chain_lock};
     void ** const table{*reinterpret_cast<void ***>(chain)};
     if(table[8] != reinterpret_cast<void *>(&hook_present))
       {
@@ -72,10 +72,9 @@ namespace edwide
           ok = ok and patch(table1, 22, reinterpret_cast<void *>(&hook_present1), reinterpret_cast<void **>(&orig_present1));
         chain1->Release();
         }
-      log_line(ok ? "hook: Present of the game's swap chain" : "hook: the game's Present could not be hooked; nothing is changed");
+      log_line("{}", ok ? "hook: Present of the game's swap chain" : "hook: the game's Present could not be hooked; nothing is changed");
       hooked.store(ok);
       }
-    ReleaseSRWLockExclusive(&chain_lock);
     }
 
   HRESULT STDMETHODCALLTYPE hook_create_chain(IDXGIFactory * factory, IUnknown * device, DXGI_SWAP_CHAIN_DESC * desc, IDXGISwapChain ** out)
@@ -120,7 +119,7 @@ namespace edwide
         ok = ok and patch(table2, 15, reinterpret_cast<void *>(&hook_create_hwnd), reinterpret_cast<void **>(&orig_create_hwnd));
         factory2->Release();
         }
-      log_line(ok ? "hook: the device's DXGI factory (CreateSwapChain, CreateSwapChainForHwnd), at the game's D3D11CreateDevice"
+      log_line("{}", ok ? "hook: the device's DXGI factory (CreateSwapChain, CreateSwapChainForHwnd), at the game's D3D11CreateDevice"
                   : "hook: the DXGI factory could not be hooked; nothing is changed");
       }
     else

@@ -21,7 +21,7 @@ namespace edwide
     log_dir = directory_from(L"EDLOADER_LOG_DIR");
     log_file = CreateFileW((log_dir + L"\\edwide_screen.log").c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                            nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    log_line("edwide_screen %s", EDWIDE_VERSION);
+    log_line("edwide_screen {}", EDWIDE_VERSION);
     ini_path = config_dir + L"\\edwide_screen.ini";
     make_ini();
     PWSTR local{};

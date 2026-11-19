@@ -83,10 +83,10 @@ namespace edwide
     told_width = width;
     told_height = height;
     if(now == state_e::on)
-      log_line("%s: the picture %ux%u, the sides laid over the monitors at %g degrees, the eye %s", again ? "on again" : "on", width,
+      log_line("{}: the picture {}x{}, the sides laid over the monitors at {:g} degrees, the eye {}", again ? "on again" : "on", width,
                height, double(settings.angle), settings.eye_cm > 0.f and settings.centre_cm > 0.f ? "as set (wings_eye_cm)" : "by the field of view");
     else
-      log_line("off: %s", why);
+      log_line("off: {}", why);
     }
 
   ///\brief the device's objects, made once for it (and the copy for the picture's size and format)
@@ -275,7 +275,7 @@ namespace edwide
     if(not ok)
       {
       state = state_e::broken;
-      log_line("off for this session: a fault in the correction (exception 0x%08lX); the game goes on without it", code);
+      log_line("off for this session: a fault in the correction (exception 0x{:08X}); the game goes on without it", as_unsigned(code));
       }
     }
   }  // namespace edwide

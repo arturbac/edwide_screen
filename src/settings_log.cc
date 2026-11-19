@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -15,26 +14,60 @@ namespace edwide
   HANDLE log_file{INVALID_HANDLE_VALUE};
   SRWLOCK log_lock = SRWLOCK_INIT;
 
-  auto log_line(char const * fmt, ...) noexcept -> void
+  namespace
+    {
+    ///\brief the room a log line is made in, and an output iterator that stops at its end
+    struct cut_buffer_t
+      {
+      char * at;
+      char * end;
+      };
+
+    struct cut_out_t
+      {
+      using difference_type = std::ptrdiff_t;
+      cut_buffer_t * b;
+
+      auto operator*() noexcept -> cut_out_t & { return *this; }
+
+      auto operator=(char c) noexcept -> cut_out_t &
+        {
+        if(b->at != b->end)
+          *b->at++ = c;
+        return *this;
+        }
+
+      auto operator++() noexcept -> cut_out_t & { return *this; }
+
+      auto operator++(int) noexcept -> cut_out_t { return *this; }
+      };
+    }  // namespace
+
+  auto log_vline(std::string_view fmt, std::format_args args) noexcept -> void
     {
     if(log_file == INVALID_HANDLE_VALUE)
       return;
     SYSTEMTIME t;
     GetSystemTime(&t);
     char buf[1024];
-    int n{std::snprintf(buf, sizeof buf, "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ ", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute,
-                        t.wSecond, t.wMilliseconds)};
-    va_list args;
-    va_start(args, fmt);
-    int const room{static_cast<int>(sizeof buf) - n - 1};
-    int const m{std::vsnprintf(buf + n, static_cast<std::size_t>(room), fmt, args)};
-    va_end(args);
-    n += m < 0 ? 0 : std::min(m, room - 1);
-    buf[n++] = '\n';
+    cut_buffer_t room{buf, buf + sizeof buf - 1};  // one byte kept for the line's end
+    try
+      {
+      std::format_to(cut_out_t{&room}, "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z ", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond,
+                     t.wMilliseconds);
+      std::vformat_to(cut_out_t{&room}, fmt, args);
+      }
+    catch(...)
+      {
+      constexpr std::string_view failed{" (log: the rest of this line could not be formatted)"};
+      for(char const c: failed)
+        if(room.at != room.end)
+          *room.at++ = c;
+      }
+    *room.at++ = '\n';
     DWORD written{};
-    AcquireSRWLockExclusive(&log_lock);
-    WriteFile(log_file, buf, static_cast<DWORD>(n), &written, nullptr);
-    ReleaseSRWLockExclusive(&log_lock);
+    exclusive_lock_t const hold{log_lock};
+    WriteFile(log_file, buf, static_cast<DWORD>(room.at - buf), &written, nullptr);
     }
 
   ///\brief a folder edloader hands its plugins (EDLOADER_CONFIG_DIR, EDLOADER_LOG_DIR); without edloader, the dll's own
@@ -137,19 +170,19 @@ namespace edwide
           char * stop{};
           float const f{std::strtof(value.c_str(), &stop)};
           if(stop == value.c_str() or *stop != '\0' or not std::isfinite(f))
-            log_line("settings: '%s = %s' cannot be read; %s stays as it was", key.c_str(), value.c_str(), key.c_str());
+            log_line("settings: '{} = {}' cannot be read; {} stays as it was", key, value, key);
           else
             s.*k.field = f;
           }
       if(not known and not key.empty())
-        log_line("settings: no setting '%s' (a typo?): ignored", key.c_str());
+        log_line("settings: no setting '{}' (a typo?): ignored", key);
       }
     s.zoom = std::clamp(s.zoom, 0.25f, 4.f);
     s.curve = std::clamp(s.curve, 0.f, 1.f);
     s.angle = std::clamp(s.angle, -80.f, 80.f);
     settings = s;
-    log_line("settings: wings %g, angle %g, centre %g px, side %g px, bezel %g px, eye %g cm, centre %g cm, fov %g, zoom %g, curve %g, "
-             "offset %g, calibrate %g",
+    log_line("settings: wings {:g}, angle {:g}, centre {:g} px, side {:g} px, bezel {:g} px, eye {:g} cm, centre {:g} cm, fov {:g}, zoom {:g}, curve {:g}, "
+             "offset {:g}, calibrate {:g}",
              double(s.wings), double(s.angle), double(s.centre_px), double(s.side_px), double(s.bezel_px), double(s.eye_cm),
              double(s.centre_cm), double(s.fov), double(s.zoom), double(s.curve), double(s.offset_y), double(s.calibrate));
     }
@@ -174,7 +207,7 @@ namespace edwide
     DWORD written{};
     WriteFile(f, text.data(), static_cast<DWORD>(text.size()), &written, nullptr);
     CloseHandle(f);
-    log_line("settings: %S made, all its lines comments", ini_path.c_str());
+    log_line("settings: {} made, all its lines comments", wide(ini_path));
     }
 
   ///\brief the game's vertical field of view from its Settings.xml (`<FOV>`), read again when the file changes
@@ -184,7 +217,7 @@ namespace edwide
     auto const at{text.find("<FOV>")};
     float const fov{at == std::string::npos ? 0.f : std::strtof(text.c_str() + at + 5, nullptr)};
     if(fov != game_fov)
-      log_line("game: the field of view %g degrees (%S)", double(fov), game_settings_path.c_str());
+      log_line("game: the field of view {:g} degrees ({})", double(fov), wide(game_settings_path));
     game_fov = fov;
     }
 
