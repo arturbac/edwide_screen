@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `edwide_screen_build_info` export: the line edworld's `build_info` shows for edwide_screen - its version and the
+  wings' state (`wings <angle> deg`, `wings off`, `hook 0`).
 - The log through `std::format` (checked when compiled; wide strings as UTF-8) in place of printf's `va_list`; the SRW
   locks held by scope objects.
 - The source split by topic (`src/*.cc` with headers, namespace `edwide`) out of one `plugin.cc`; nothing changed in

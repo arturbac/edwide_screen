@@ -37,6 +37,9 @@ DirectX 11, so it should work on Windows the same way, but nobody has tried that
 3. `wings_calibrate = 1`, change `wings_angle` in the ini until the circles look round from where you sit (each
    save shows within a second), then `wings_calibrate = 0`.
 
+With edworld loaded too, its `build_info` corner shows a line `edwide_screen <version> wings <angle> deg` (or `wings
+off`) beside edworld's own: edwide_screen runs and what it does now.
+
 How to set it up in full: [doc/users.md](doc/users.md). How it works: [doc/developers.md](doc/developers.md).
 
 License: MIT ([LICENSE](LICENSE)).

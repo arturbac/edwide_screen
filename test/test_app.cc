@@ -186,6 +186,15 @@ auto main() -> int
   if(not plugin)
     return 1;
   auto const hooked{reinterpret_cast<int (*)()>(GetProcAddress(plugin, "edwide_screen_hooked"))};
+  // edworld's build_info line for edwide_screen (2026-11-19): name, version, the wings' state
+  {
+  auto const build_info{reinterpret_cast<int (*)(char *, int)>(GetProcAddress(plugin, "edwide_screen_build_info"))};
+  char line[64]{};
+  int const n{build_info ? build_info(line, static_cast<int>(sizeof line)) : 0};
+  std::printf("      build_info \"%s\"\n", line);
+  check(n > 0 and std::string{line}.starts_with("edwide_screen ") and (std::string{line}.find(" wings ") != std::string::npos or std::string{line}.ends_with(" hook 0")),
+        "edwide_screen_build_info: \"edwide_screen <version> wings ...\"");
+  }
 
   app_t a{};
   a.width = 960;

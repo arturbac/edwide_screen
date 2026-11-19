@@ -119,6 +119,19 @@ extern "C" HRESULT WINAPI edwide_create_device_and_chain(IDXGIAdapter * adapter,
   return hr;
   }
 
+///\brief for edworld's build_info (a line over its own, 2026-11-19): "edwide_screen <version> wings <angle>" (or "wings
+/// off", "hook 0"), NUL-ended within size; its length (0: no room)
+extern "C" __declspec(dllexport) auto edwide_screen_build_info(char * text, int size) -> int
+  {
+  if(not text or size <= 0)
+    return 0;
+  if(not hook_at_start)
+    return static_cast<int>(format_into(text, static_cast<std::size_t>(size), "edwide_screen {} hook 0", EDWIDE_VERSION));
+  if(settings.wings < 0.5f)
+    return static_cast<int>(format_into(text, static_cast<std::size_t>(size), "edwide_screen {} wings off", EDWIDE_VERSION));
+  return static_cast<int>(format_into(text, static_cast<std::size_t>(size), "edwide_screen {} wings {:g} deg", EDWIDE_VERSION, double(settings.angle)));
+  }
+
 ///\brief for the test: 1 once a swap chain's Present is hooked
 extern "C" __declspec(dllexport) auto edwide_screen_hooked() -> int
   {
