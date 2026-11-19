@@ -4,7 +4,9 @@
 
 Tried only on Linux (Proton, DXVK); on Windows it should work the same way, but nobody has tried that yet.
 
-1. edloader installed (the game's `d3d11.dll`), with its folder `%USERPROFILE%\edloader`.
+1. Install edloader first: [edloader's guide, Install](https://github.com/arturbac/edloader/blob/main/doc/users.md#install).
+   Its folder `edloader` is `C:\Users\<you>\edloader` on Windows, `.../steamapps/compatdata/359320/pfx/drive_c/users/steamuser/edloader`
+   on Linux with Steam.
 2. `edwide_screen.dll` into `edloader\plugins`, and a line `edwide_screen.dll` in `edloader\edloader.txt`, before
    EDHM's line if EDHM is in the list. It is a small element of the list: it passes the game's call on and only
    hooks the picture's showing.
