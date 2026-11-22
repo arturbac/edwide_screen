@@ -3,7 +3,8 @@
 # Leaves the pictures grid.bmp (as the game gives it), grid_30.bmp (corrected at 30 degrees) and calibrate_20.bmp,
 # calibrate_30.bmp, calibrate_40.bmp (the calibration's shapes at three angles) in the run directory, to look at; a
 # second run in no_hook/ with wings_hook = 0.
-# Usage: tools/test.sh <build dir> <scratch dir>; environment: EDWIDE_WINEPREFIX (a wine prefix kept between runs)
+# Usage: tools/test.sh <build dir> <scratch dir>; environment: EDWIDE_WINEPREFIX (a wine prefix kept between runs);
+# with no DISPLAY, WINE_USE_EGL=1 unless set
 set -euo pipefail
 BUILD=$(cd "${1:?build dir}" && pwd)
 SCR=${2:?scratch dir}
@@ -12,6 +13,9 @@ for f in edwide_screen.dll edwide_test.exe; do
   [[ -f $BUILD/$f ]] || { echo "$0: no $BUILD/$f (build first)" >&2; exit 1; }
 done
 export WINEPREFIX=$EDWIDE_WINEPREFIX
+# with no X server (Wayland only, e.g. another account's session) wine's OpenGL, which wined3d needs, comes only
+# through EGL, off unless WINE_USE_EGL is set
+[[ -n ${DISPLAY:-} ]] || export WINE_USE_EGL=${WINE_USE_EGL:-1}
 RUN=$(mktemp -d "$SCR/edwide-test.XXXXXX")
 cp "$BUILD/edwide_screen.dll" "$BUILD/edwide_test.exe" "$RUN/"
 set +e

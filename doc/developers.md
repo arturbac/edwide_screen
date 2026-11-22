@@ -60,3 +60,5 @@ The log: `log_line` takes a `std::format` format checked against its arguments w
   angle and the eyes' distance are; the line is a pixel and a half of the monitor wide wherever it is.
 - `tools/bench.sh <build dir> <scratch> [w h]` (`EDWIDE_WINEPREFIX`, `EDWIDE_DXVK_DIR` with DXVK's d3d11.dll and
   dxgi.dll): a frame's time on the graphics card with the correction less without it, median of 100.
+- With no `DISPLAY` (Wayland only) both scripts set `WINE_USE_EGL=1` unless it is set already: wine's OpenGL, which
+  wined3d needs, comes then only through EGL.
