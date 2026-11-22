@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The version in the log: `vX.Y.Z` only for a release; any other build `<the last tag>-<commit's short hash>`, with
+  `-dirty` when built from uncommitted changes (before, `git describe`: a build of uncommitted changes on the tag's
+  commit said only `vX.Y.Z-dirty`).
 - `edwide_screen_build_info` export: the line edworld's `build_info` shows for edwide_screen - its version and the
   wings' state (`wings <angle> deg`, `wings off`, `hook 0`).
 - The log through `std::format` (checked when compiled; wide strings as UTF-8) in place of printf's `va_list`; the SRW

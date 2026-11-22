@@ -46,6 +46,9 @@ The log: `log_line` takes a `std::format` format checked against its arguments w
 
 - `cmake --preset edwide-release` and `cmake --build build/edwide-release -j24` (clang-cl, MSVC_ROOT, fxc under wine;
   `cmake/` as edworld's).
+- The version in the log is taken from git at each build (`cmake/version.cmake`, the same file as edloader's):
+  `vX.Y.Z` for a release (HEAD on its tag, no uncommitted changes), otherwise `<the last vX.Y.Z tag>-<HEAD's short
+  hash>`, with `-dirty` when tracked files differ from HEAD (`v0.0.0-<hash>` before the first tag).
 - `tools/test.sh <build dir> <scratch>` (`EDWIDE_WINEPREFIX`): `test/test_app.cc` loads the plugin as edloader would,
   presents a picture 960x240 laid out as 480 + 2 x 240 with known colours and reads it back: the middle the same bits,
   each side's pixel the colour of where `wings_math.h` says it comes from (within 3 of 255), angle 0 and wings 0 change
