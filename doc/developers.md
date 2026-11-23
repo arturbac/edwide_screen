@@ -45,7 +45,11 @@ The log: `log_line` takes a `std::format` format checked against its arguments w
 ## Build and test
 
 - `cmake --preset edwide-release` and `cmake --build build/edwide-release -j24` (clang-cl, MSVC_ROOT, fxc under wine;
-  the toolchain and the fxc step from edplugin_common, below).
+  the toolchain and the fxc step from edplugin_common, below). The presets `kdev-edwide-debug` and
+  `kdev-edwide-release` build without a build directory, for an IDE that chooses its own, with clang's GNU-style
+  driver (`edplugin_common/cmake/clang-msvc-sdk.cmake`; clang, clang++, llvm-ar, llvm-ranlib) instead of clang-cl: an
+  IDE that hands `compile_commands.json` to libclang (KDevelop) does not take clang-cl's options. Releases are built
+  with clang-cl.
 - The shared library edplugin_common (the toolchain, CPM with stralgo and small_vectors, the version and fxc build
   steps, the SRW locks and the text helpers such as `wide(...)`) is a clone in `edplugin_common/`, ignored by git, on
   the commit the file `edplugin_common.commit` pins:

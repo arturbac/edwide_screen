@@ -16,8 +16,11 @@ endif()
 
 project(edwide_screen LANGUAGES CXX)
 
-if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-  message(FATAL_ERROR "edwide_screen builds with clang-cl: configure with a preset or -DCMAKE_TOOLCHAIN_FILE=edplugin_common/cmake/clang-cl-msvc-sdk.cmake")
+# clang-cl, or clang's GNU-style driver targeting the MSVC ABI (the kdev-* presets, clang-msvc-sdk.cmake: an IDE's
+# code model)
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+   OR NOT (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC" OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC"))
+  message(FATAL_ERROR "edwide_screen builds with clang-cl (or clang for the MSVC ABI): configure with a preset or -DCMAKE_TOOLCHAIN_FILE=edplugin_common/cmake/clang-cl-msvc-sdk.cmake")
 endif()
 
 set(CMAKE_CXX_STANDARD 23)
@@ -40,10 +43,10 @@ add_custom_target(edwide_generated DEPENDS "${gen}/wings_vs.h" "${gen}/wings_ps.
 add_library(edwide_screen SHARED src/entry.cc src/settings_log.cc src/correction.cc src/hooks.cc)
 target_include_directories(edwide_screen PRIVATE "${gen}")
 target_link_libraries(edwide_screen PRIVATE edplugin_common::edplugin_common kernel32 user32 d3d11 dxgi dxguid)
-target_compile_options(edwide_screen PRIVATE /W4)
+edplugin_common_warnings(edwide_screen)
 # a chain element of edloader's: its two calls, passed on to the next d3d11 and the factory hooked on the device made
-target_link_options(edwide_screen PRIVATE /DEBUG:FULL $<$<NOT:$<CONFIG:Debug>>:/OPT:REF /OPT:ICF>
-                    /EXPORT:D3D11CreateDevice=edwide_create_device /EXPORT:D3D11CreateDeviceAndSwapChain=edwide_create_device_and_chain)
+target_link_options(edwide_screen PRIVATE LINKER:/DEBUG:FULL $<$<NOT:$<CONFIG:Debug>>:LINKER:/OPT:REF,/OPT:ICF>
+                    LINKER:/EXPORT:D3D11CreateDevice=edwide_create_device LINKER:/EXPORT:D3D11CreateDeviceAndSwapChain=edwide_create_device_and_chain)
 set_target_properties(edwide_screen PROPERTIES PREFIX "")
 add_dependencies(edwide_screen edwide_generated)
 edplugin_common_version(EDWIDE_VERSION edwide_version.h edwide_screen)
@@ -55,5 +58,5 @@ if(EDWIDE_TESTS)
   target_include_directories(edwide_test PRIVATE "${CMAKE_SOURCE_DIR}/src")
   target_link_libraries(edwide_test PRIVATE d3d11 dxgi dxguid user32 windowscodecs ole32)
   target_compile_definitions(edwide_test PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX _CRT_SECURE_NO_WARNINGS)
-  target_compile_options(edwide_test PRIVATE /W4)
+  edplugin_common_warnings(edwide_test)
 endif()

@@ -15,6 +15,9 @@
   locks held by scope objects.
 - The source split by topic (`src/*.cc` with headers, namespace `edwide`) out of one `plugin.cc`; nothing changed in
   what it does.
+- The `kdev-*` presets build with clang's GNU-style driver (edplugin_common's `clang-msvc-sdk.cmake`) instead of
+  clang-cl, so an IDE whose code model is libclang (KDevelop) reads the compile commands; releases stay with
+  clang-cl. Warnings through `edplugin_common_warnings`, linker options with CMake's `LINKER:` prefix.
 
 ## 1.0.0-beta.1
 
