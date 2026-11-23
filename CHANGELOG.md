@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Built with edplugin_common, the library the plugins share: a clone in the plugin's directory on the commit
+  `edplugin_common.commit` pins. Without the clone the build stops with the commands that make it; another commit or
+  changes in it are a warning, and an error in a release build. The log says the library's commit in a line of its
+  own after the version (`edplugin_common <hash>`).
 - The version in the log: `vX.Y.Z` only for a release; any other build `<the last tag>-<commit's short hash>`, with
   `-dirty` when built from uncommitted changes (before, `git describe`: a build of uncommitted changes on the tag's
   commit said only `vX.Y.Z-dirty`).

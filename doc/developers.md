@@ -45,8 +45,27 @@ The log: `log_line` takes a `std::format` format checked against its arguments w
 ## Build and test
 
 - `cmake --preset edwide-release` and `cmake --build build/edwide-release -j24` (clang-cl, MSVC_ROOT, fxc under wine;
-  `cmake/` as edworld's).
-- The version in the log is taken from git at each build (`cmake/version.cmake`, the same file as edloader's):
+  the toolchain and the fxc step from edplugin_common, below).
+- The shared library edplugin_common (the toolchain, CPM with stralgo and small_vectors, the version and fxc build
+  steps, the SRW locks and the text helpers such as `wide(...)`) is a clone in `edplugin_common/`, ignored by git, on
+  the commit the file `edplugin_common.commit` pins:
+
+  ```
+  git clone https://github.com/arturbac/edplugin_common.git edplugin_common
+  git -C edplugin_common checkout $(cat edplugin_common.commit)
+  ```
+
+  Without it the configure stops with these two commands. At every build the clone is checked against
+  `edplugin_common.commit`: another commit, changes in the clone, or the pinned commit missing from it (then `git -C
+  edplugin_common fetch origin` first) are a warning, and an error in a release build (HEAD on a tag `vX.Y.Z`, a
+  pre-release tag `vX.Y.Z-beta.N` too). The log says the clone's commit in a line of its own at the start
+  (`edplugin_common <hash>`, `-dirty` for changes in it, ` (pinned <hash>)` when it is not on the pinned commit). A
+  build directory made before the toolchain moved into the clone keeps the old path: configure it again with
+  `--fresh`. A commit of the library is pushed to GitHub before a commit of this plugin that pins it. CPM comes with
+  the library: `-DCPM_SOURCE_CACHE=<a filled cache> -DFETCHCONTENT_FULLY_DISCONNECTED=ON` configures without the
+  network. fxc is found in the SDK by default; `EDPLUGIN_COMMON_FXC` names another one, `EDPLUGIN_COMMON_WINE` another
+  wine.
+- The version in the log is taken from git at each build (`edplugin_common/cmake/version.cmake`):
   `vX.Y.Z` for a release (HEAD on its tag, no uncommitted changes), otherwise `<the last vX.Y.Z tag>-<HEAD's short
   hash>`, with `-dirty` when tracked files differ from HEAD (`v0.0.0-<hash>` before the first tag).
 - `tools/test.sh <build dir> <scratch>` (`EDWIDE_WINEPREFIX`): `test/test_app.cc` loads the plugin as edloader would,
