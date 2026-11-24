@@ -243,20 +243,39 @@ namespace edwide
     target->Release();
     }
 
-  // the correction under edplugin_common's guard: off for the session after its first fault
-  constinit edplugin_common::guard_t correction_guard{"correction", 1};
+  auto correct_caught(IDXGISwapChain * chain) -> bool
+    {
+    try
+      {
+      correct(chain);
+      return true;
+      }
+    catch(...)
+      {
+      return false;
+      }
+    }
 
   auto guarded(IDXGISwapChain * chain) noexcept -> void
     {
     if(state == state_e::broken or depth != 0)
       return;
     ++depth;
-    (void)correction_guard.run([&] { correct(chain); },
-                               [](edplugin_common::fault_t const &) noexcept
-                               {
-                                 state = state_e::broken;
-                                 log_line("correction: the game goes on without it");
-                               });
+    bool ok{};
+    DWORD code{};
+    __try
+      {
+      ok = correct_caught(chain);
+      }
+    __except(code = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER)
+      {
+      ok = false;
+      }
     --depth;
+    if(not ok)
+      {
+      state = state_e::broken;
+      log_line("off for this session: a fault in the correction (exception 0x{:08X}); the game goes on without it", as_unsigned(code));
+      }
     }
   }  // namespace edwide

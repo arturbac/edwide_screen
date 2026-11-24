@@ -7,7 +7,6 @@
 
 #include <edplugin_common/core/lock.h>
 #include <edplugin_common/file/file.h>
-#include <edplugin_common/guard/guard.h>
 #include <edplugin_common/log/log.h>
 #include <edplugin_common/paths/paths.h>
 #include <edplugin_common/text/format.h>

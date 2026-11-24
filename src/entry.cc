@@ -40,24 +40,21 @@ namespace edwide
 
   INIT_ONCE start_once = INIT_ONCE_STATIC_INIT;
 
-  // the parts under edplugin_common's guard, each off for the session after its first fault (logged with its place)
-  constinit edplugin_common::guard_t start_guard{"start", 1};
-  constinit edplugin_common::guard_t hook_guard{"hook", 1};
-
-  ///\brief the start, once, at the game's first device (not under the loader lock), never letting anything out; the
-  /// guard inside the once's callback, never around it
+  ///\brief the start, once, at the game's first device (not under the loader lock), never letting anything out
   auto start_once_caught() noexcept -> void
     {
     InitOnceExecuteOnce(
       &start_once,
       [](PINIT_ONCE, PVOID, PVOID *) -> BOOL
         {
-        (void)start_guard.run([] { start(); },
-                              [](edplugin_common::fault_t const &) noexcept
-                              {
-                                hook_at_start = false;
-                                log_line("start: nothing is hooked this session");
-                              });
+        __try
+          {
+          [] { try { start(); } catch(...) { log_line("start: an exception; nothing is hooked"); hook_at_start = false; } }();
+          }
+        __except(EXCEPTION_EXECUTE_HANDLER)
+          {
+          hook_at_start = false;
+          }
         return TRUE;
         },
       nullptr, nullptr);
@@ -76,18 +73,17 @@ namespace edwide
     {
     if(not hook_at_start)
       return;
-    (void)hook_guard.run(
-      [&]
+    __try
       {
-        hook_factory_of(device);
-        if(chain)
-          hook_chain(chain);
-      },
-      [](edplugin_common::fault_t const &) noexcept
+      hook_factory_of(device);
+      if(chain)
+        hook_chain(chain);
+      }
+    __except(EXCEPTION_EXECUTE_HANDLER)
       {
-        hook_at_start = false;
-        log_line("hook: nothing more is hooked this session");
-      });
+      log_line("hook: a fault while hooking; nothing more is hooked");
+      hook_at_start = false;
+      }
     }
   }  // namespace edwide
 
