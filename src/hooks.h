@@ -18,10 +18,11 @@ namespace edwide
   extern edplugin_common::guard_t hook_guard;
 
   ///\brief `hook()` under hook_guard: the first fault turns the hooks off for the session (no swap chain gets Present
-  /// hooked after it) and hook_at_start false
+  /// hooked after it, but one of a class already hooked keeps its correction: the table is the class's),
+  /// hook_guard.broken() from then on
   template<typename hook_t>
   auto hook_guarded(hook_t && hook) noexcept -> void
     {
-    static_cast<void>(hook_guard.run(hook, [](edplugin_common::fault_t const &) noexcept { hook_at_start = false; }));
+    static_cast<void>(hook_guard.run(hook));
     }
   }  // namespace edwide

@@ -37,6 +37,7 @@ namespace edwide
   SRWLOCK open_lock = SRWLOCK_INIT;
   bool opened{};                     ///< open_log_and_ini done, under open_lock
   std::atomic<bool> game_started{};  ///< start() begun: the export does nothing after it
+  std::atomic<bool> start_failed{};  ///< a fault or an exception in the start: nothing hooked this session
 
   ///\brief open_log_and_ini once in the process, whether the game's start or the export comes first: one log, one
   /// first read of the ini
@@ -53,6 +54,8 @@ namespace edwide
     {
     game_started.store(true, std::memory_order_release);
     open_log_and_ini_once();
+    if(test_fault_at(test_fault_e::start))
+      RaiseException(EXCEPTION_ACCESS_VIOLATION, 0, 0, nullptr);  // the test's: a fault after the log and the ini
     // the game's field of view: Settings.xml read by look_at_files below (the ini, read above, is not read again)
     PWSTR local{};
     if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &local)) and local)
@@ -78,7 +81,7 @@ namespace edwide
         edplugin_common::fault_t fault;
         if(not edplugin_common::run_guarded([] { start(); }, fault))
           {
-          hook_at_start = false;
+          start_failed = true;
           char text[320];
           log_line("start: {}; nothing is hooked", edplugin_common::fault_line(fault, text));
           }
@@ -98,7 +101,7 @@ namespace edwide
 
   auto hook_device_caught(ID3D11Device * device, IDXGISwapChain * chain) noexcept -> void
     {
-    if(not hook_at_start)
+    if(start_failed or not hook_at_start or hook_guard.broken())
       return;
     hook_guarded(
       [device, chain]
@@ -144,13 +147,17 @@ extern "C" HRESULT WINAPI edwide_create_device_and_chain(IDXGIAdapter * adapter,
   return hr;
   }
 
-///\brief for edworld's build_info (a line over its own, 2026-11-19): "edwide_screen <version> wings <angle>" (or "wings
-/// off", "hook 0", "correction off" after a fault turned the correction off), NUL-ended within size; its length (0: no
-/// room)
+///\brief for edworld's build_info (a line over its own, 2026-11-19): "edwide_screen <version> wings <angle>", or the
+/// first that holds of "start off" (a fault in the start), "hook off" (a fault while hooking), "hook 0" (wings_hook =
+/// 0), "correction off" (a fault in the correction), "wings off"; NUL-ended within size; its length (0: no room)
 extern "C" __declspec(dllexport) auto edwide_screen_build_info(char * text, int size) -> int
   {
   if(not text or size <= 0)
     return 0;
+  if(start_failed)
+    return static_cast<int>(format_into(text, static_cast<std::size_t>(size), "edwide_screen {} start off", EDWIDE_VERSION));
+  if(hook_guard.broken())
+    return static_cast<int>(format_into(text, static_cast<std::size_t>(size), "edwide_screen {} hook off", EDWIDE_VERSION));
   if(not hook_at_start)
     return static_cast<int>(format_into(text, static_cast<std::size_t>(size), "edwide_screen {} hook 0", EDWIDE_VERSION));
   if(correction_off())
@@ -164,6 +171,13 @@ extern "C" __declspec(dllexport) auto edwide_screen_build_info(char * text, int 
 extern "C" __declspec(dllexport) auto edwide_screen_hooked() -> int
   {
   return hooked.load() ? 1 : 0;
+  }
+
+///\brief for the test only (test_app's fault runs): the next fault, once, at `where` (1 the start, 2 the hooking, 3 the
+/// correction; else none). A function, not an environment variable: Proton passes the environment on to the game
+extern "C" __declspec(dllexport) auto edwide_screen_test_fault(int where) -> void
+  {
+  test_fault.store(where >= 1 and where <= 3 ? static_cast<test_fault_e>(where) : test_fault_e::none, std::memory_order_relaxed);
   }
 
 ///\brief for tools/doc.sh, not for the game: the log and the ini as at the game's start, then doc/settings.md to the

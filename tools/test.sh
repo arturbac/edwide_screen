@@ -2,8 +2,9 @@
 # edwide_screen's test without the game: test/test_app.cc under wine (wine's own d3d11) with the plugin beside it.
 # Leaves the pictures grid.bmp (as the game gives it), grid_30.bmp (corrected at 30 degrees) and calibrate_20.bmp,
 # calibrate_30.bmp, calibrate_40.bmp (the calibration's shapes at three angles) in the run directory, to look at; a
-# second run in no_hook/ with wings_hook = 0. Last tools/doc.sh: the ini made and read with no device, compared with
-# test/data.
+# second run in no_hook/ with wings_hook = 0, then three with the test's fault (fault_start/, fault_hook/,
+# fault_correction/: the plugin's export edwide_screen_test_fault, set by the test's program). Last tools/doc.sh: the
+# ini made and read with no device, compared with test/data.
 # Usage: tools/test.sh <build dir> <scratch dir>; environment: EDWIDE_WINEPREFIX (a wine prefix kept between runs),
 # WINE_COMMON_TIMEOUT (seconds for one wine run, 600 unless set); with no DISPLAY, WINE_USE_EGL=1 unless set.
 # Needs edplugin_common cloned in the checkout (its tools/wine-common.sh).
@@ -28,6 +29,13 @@ rc=$?
 mkdir "$RUN/no_hook"
 cp "$BUILD/edwide_screen.dll" "$BUILD/edwide_test.exe" "$RUN/no_hook/"
 wine_common_run "$RUN/no_hook" "$RUN/out.txt" EDWIDE_TEST_NOHOOK=1 -- edwide_test.exe || rc=1
+# the test's faults: the start, the hooking, the correction (after the plugin's state took the game's place)
+for where in start hook correction; do
+  mkdir "$RUN/fault_$where"
+  cp "$BUILD/edwide_screen.dll" "$BUILD/edwide_test.exe" "$RUN/fault_$where/"
+  echo "--- the test's fault: $where" >> "$RUN/out.txt"
+  wine_common_run "$RUN/fault_$where" "$RUN/out.txt" EDWIDE_TEST_FAULT=$where -- edwide_test.exe || rc=1
+done
 echo "--- tools/doc.sh: the ini with no device and no drawing" >> "$RUN/out.txt"
 "$HERE/tools/doc.sh" "$BUILD" "$SCR" >> "$RUN/out.txt" 2>&1 || rc=1
 set -e

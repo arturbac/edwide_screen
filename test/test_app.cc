@@ -3,6 +3,9 @@
 // green by y) presented through the hook and read back. Checked: the middle the same bits; each side's pixel the
 // colour of where wings_math.h says it comes from; angle 0 changes nothing; wings 0 changes nothing; another size
 // passes untouched and is said in the log, the right size again turns it back on; ResizeBuffers is never refused.
+// EDWIDE_TEST_FAULT=start|hook|correction (tools/test.sh's fault runs, each in a folder of its own): the plugin's
+// export edwide_screen_test_fault arms one fault there; the picture as it was, build_info's word, the log's lines, and
+// for correction the game's state (its viewport) given back.
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi.h>
@@ -186,6 +189,19 @@ auto main() -> int
   if(not plugin)
     return 1;
   auto const hooked{reinterpret_cast<int (*)()>(GetProcAddress(plugin, "edwide_screen_hooked"))};
+  // EDWIDE_TEST_FAULT: 1 start, 2 hook, 3 correction (the export's numbers); 0 none
+  char fault_name[16]{};
+  GetEnvironmentVariableA("EDWIDE_TEST_FAULT", fault_name, sizeof fault_name);
+  std::string const fault{fault_name};
+  int const fault_at{fault == "start" ? 1 : fault == "hook" ? 2 : fault == "correction" ? 3 : 0};
+  if(fault_at != 0)
+    {
+    auto const arm{reinterpret_cast<void (*)(int)>(GetProcAddress(plugin, "edwide_screen_test_fault"))};
+    check(arm != nullptr, "the test's export edwide_screen_test_fault");
+    if(not arm)
+      return 1;
+    arm(fault_at);
+    }
   // edworld's build_info line for edwide_screen (2026-11-19): name, version, the wings' state
   {
   auto const build_info{reinterpret_cast<int (*)(char *, int)>(GetProcAddress(plugin, "edwide_screen_build_info"))};
@@ -241,6 +257,42 @@ auto main() -> int
   check(SUCCEEDED(hr) and a.chain, "the test's swap chain made");
   if(FAILED(hr) or not a.chain)
     return 1;
+  if(fault_at != 0)
+    {
+    auto const build_info{reinterpret_cast<int (*)(char *, int)>(GetProcAddress(plugin, "edwide_screen_build_info"))};
+    // the game's state before Present: a viewport of its own, which the plugin's state swap must give back
+    D3D11_VIEWPORT const game_port{3.f, 5.f, 101.f, 57.f, 0.f, 1.f};
+    a.ctx->RSSetViewports(1, &game_port);
+    bool const first{same(present(a), pattern(a.width, a.height), 0)};
+    D3D11_VIEWPORT after{};
+    UINT ports{1};
+    a.ctx->RSGetViewports(&ports, &after);
+    bool const second{same(present(a), pattern(a.width, a.height), 0)};
+    char line[64]{};
+    if(build_info)
+      build_info(line, static_cast<int>(sizeof line));
+    std::string const log{read_log()};
+    std::printf("      build_info \"%s\"\n", line);
+    char const * const word{fault_at == 1 ? " start off" : fault_at == 2 ? " hook off" : " correction off"};
+    check(first and second, "a fault: the picture as it was");
+    check(std::string{line}.ends_with(word), "a fault: build_info says it");
+    if(fault_at == 1)
+      check(hooked and not hooked() and log.find("start: an access violation") != std::string::npos
+              and log.find("nothing is hooked") != std::string::npos,
+            "start: nothing hooked, the guard's line");
+    else if(fault_at == 2)
+      check(hooked and not hooked() and log.find("hook: an access violation") != std::string::npos
+              and log.find("hook: off for this session") != std::string::npos,
+            "hook: nothing hooked, the guard's line, the hooks off");
+    else
+      check(hooked and hooked() and ports == 1 and std::memcmp(&after, &game_port, sizeof after) == 0
+              and log.find("correction: an access violation") != std::string::npos
+              and log.find("the game's state given back") != std::string::npos and log.find("the device's objects kept") != std::string::npos
+              and log.find("correction: off for this session") != std::string::npos,
+            "correction: the game's state (its viewport) given back, the device's objects kept, the guard's line, the correction off");
+    std::printf(failures ? "FAILED (%d failure(s))\n" : "PASSED (%d failure(s))\n", failures);
+    return failures ? 1 : 0;
+    }
   if(no_hook)
     {
     check(hooked and not hooked(), "wings_hook 0: nothing hooked");

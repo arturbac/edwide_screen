@@ -86,6 +86,7 @@ namespace edwide
   auto make_ini() -> void;
   ///\brief doc/settings.md from the table of settings, to the file EDWIDE_SETTINGS_DOC names (nothing without it); false
   /// when it was asked and not written (in the log)
+  [[nodiscard]]
   auto write_settings_doc() -> bool;
   ///\brief the ini read now when it is there (the start's first read), its time noted for look_at_files
   auto read_ini_now() -> void;

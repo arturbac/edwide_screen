@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
 #include <string>
 #include <string_view>
 
@@ -163,16 +164,18 @@ namespace edwide
     std::string text{"; edwide_screen: the sides of the game's picture laid over side monitors set at an angle (README.md)\r\n"
                      "; a line without ';' sets a value; read again within a second of a change\r\n"};
     settings_t const d{};
+    // straight into the text, no line buffer to cut a long help short; once at the start
     for(setting_t const & k: settings_table)
-      {
-      char line[256];
-      format_into(line, "; {}\r\n;{} = {:g}\r\n", k.help, k.name, double(d.*k.field));
-      text += line;
-      }
+      std::format_to(std::back_inserter(text), "; {}\r\n;{} = {:g}\r\n", k.help, k.name, double(d.*k.field));
     // CREATE_NEW: a player's ini is never written over, also one made between the look above and this
     HANDLE const f{CreateFileW(ini_path.c_str(), GENERIC_WRITE | DELETE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
     if(f == INVALID_HANDLE_VALUE)
+      {
+      DWORD const error{GetLastError()};
+      if(error != ERROR_FILE_EXISTS and error != ERROR_ALREADY_EXISTS)  // made between the look above and this: kept
+        log_line("settings: {} cannot be made (error {}); the defaults", wide(ini_path), error);
       return;
+      }
     DWORD written{};
     bool const wrote{WriteFile(f, text.data(), static_cast<DWORD>(text.size()), &written, nullptr) != FALSE};
     DWORD const error{wrote ? 0 : GetLastError()};

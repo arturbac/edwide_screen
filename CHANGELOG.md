@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- After a fault in the correction the device's objects are kept (before, let go: another thread's Present still in
+  the correction could have used them); the log's line says `the picture let go (the device's objects kept)`.
+- `build_info` tells a fault from the setting: `start off` (a fault in the start), `hook off` (a fault while hooking;
+  a swap chain of a class hooked before keeps its correction), `hook 0` only for `wings_hook = 0` (before, all three said
+  `hook 0`).
+- A new reason of the same state at the same size is a line of its own. The correction says `off: <why>` where it
+  stopped without a word: no device or picture from the swap chain, a
+  context without `ID3D11DeviceContext1` (before, the log said `on` and nothing was drawn).
+- A new `edwide_screen.ini` that cannot be made (no folder, no right to write) is said in the log with the error
+  (before, nothing); one made by another between the look and the write is kept, as before. Its lines go straight into
+  the text, so a long help is never cut. The ini byte for byte as before.
+- `tools/test.sh`: three runs with the test's fault (start, hook, correction) through the export
+  `edwide_screen_test_fault`, for the test only.
+- `make_gpu`'s `ID3D11Device1` held in the frame's record, so a fault does not leave it referenced.
+
 - The settings are one table in the code: the ini made from it, read by it, and `doc/settings.md` made from it (each
   setting's default, range and whether a change applies at once or at the next start); `doc/users.md` links it in
   place of its own table. The ini and the log's settings lines stay as they were. `tools/doc.sh` checks the ini, the
@@ -11,9 +26,9 @@
   correction or the hooks is logged with its place (`<module>+0x<offset>`; a C++ exception with its text) in two
   lines, `<part>: ... (1 of 1)` and `<part>: off for this session`; before, the correction logged one line with the
   exception's code (0 for a C++ exception), the hooks one line without it. A fault in the start is one line
-  `start: ...; nothing is hooked` (before, none). After a fault in the correction the game gets its context state
-  back when the plugin's was in its place, the picture and the plugin's views and objects are let go, and a third
-  line says so (before, a fault there could leave them held); edworld's `build_info` line then says `correction off`.
+  `start: ...; nothing is hooked` (before, only a C++ exception, without its text). After a fault in the correction
+  the game gets its context state back when the plugin's was in its place, the picture and the plugin's views are let
+  go, and a third line says so (before, a fault there could leave them held); edworld's `build_info` line then says `correction off`.
 - A new `edwide_screen.ini` not written whole is taken away again through its own handle and said in the log with the
   bytes written; "made" is logged only for a file written whole.
 - Built with edplugin_common at its commit with the modules `guard` and `settings_doc` (8af49e9).

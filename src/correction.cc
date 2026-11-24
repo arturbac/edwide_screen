@@ -47,6 +47,7 @@ namespace edwide
   struct frame_t
     {
     ID3D11Device * device;
+    ID3D11Device1 * device1;  ///< make_gpu's, while it makes the state
     ID3D11Texture2D * picture;
     ID3D11RenderTargetView * target;
     ID3D11DeviceContext * ctx;
@@ -59,8 +60,10 @@ namespace edwide
   constinit thread_local frame_t frame{};
   state_e state{state_e::unknown};
   UINT told_width{}, told_height{};
+  std::string told_why;  ///< with the state and the size: another reason of the same state is a line too
   std::atomic<bool> hooked{};
   std::atomic<bool> hook_at_start{true};
+  std::atomic<test_fault_e> test_fault{};
   thread_local int depth{};
   // the correction under edplugin_common's guard: the first fault turns it off for the session
   constinit edplugin_common::guard_t correction_guard{"correction", 1};
@@ -97,8 +100,9 @@ namespace edwide
 
   auto tell(state_e now, UINT width, UINT height, char const * why) -> void
     {
-    if(now == state and width == told_width and height == told_height)
+    if(now == state and width == told_width and height == told_height and told_why == why)
       return;
+    told_why = why;
     bool const again{state != state_e::unknown};
     state = now;
     told_width = width;
@@ -116,12 +120,15 @@ namespace edwide
     if(gpu.device != device)
       {
       release_gpu();
-      ID3D11Device1 * device1{};
+      ID3D11Device1 * & device1{frame.device1};
       if(FAILED(device->QueryInterface(__uuidof(ID3D11Device1), reinterpret_cast<void **>(&device1))) or not device1)
+        {
+        release(device1);
         return false;
+        }
       D3D_FEATURE_LEVEL const level{device->GetFeatureLevel()};
       HRESULT const hr{device1->CreateDeviceContextState(0, &level, 1, D3D11_SDK_VERSION, __uuidof(ID3D11Device1), nullptr, &gpu.state)};
-      device1->Release();
+      release(device1);
       if(FAILED(hr))
         return false;
       device->AddRef();
@@ -177,10 +184,10 @@ namespace edwide
         }
       } const held{};
     if(FAILED(chain->GetDevice(__uuidof(ID3D11Device), reinterpret_cast<void **>(&device))) or not device)
-      return;
+      return tell(state_e::off_picture, 0, 0, "no d3d11 device behind the swap chain");
     chain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void **>(&picture));
     if(not picture)
-      return;
+      return tell(state_e::off_picture, 0, 0, "no picture from the swap chain (its buffer 0)");
     D3D11_TEXTURE2D_DESC d{};
     picture->GetDesc(&d);
     char why[192];
@@ -221,53 +228,61 @@ namespace edwide
       release(target);
       return tell(state_e::off_picture, d.Width, d.Height, "the picture cannot be drawn into");
       }
+    // the context before the state is said: without ID3D11DeviceContext1 (its state swap) nothing is drawn, so off
+    ID3D11DeviceContext * & ctx{frame.ctx};
+    device->GetImmediateContext(&ctx);
+    ID3D11DeviceContext1 * & ctx1{frame.ctx1};
+    if(ctx)
+      ctx->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void **>(&ctx1));
+    if(not ctx1)
+      {
+      release(ctx);
+      release(target);
+      return tell(state_e::off_picture, d.Width, d.Height, "the device's context has no ID3D11DeviceContext1 (its state swap)");
+      }
     tell(state_e::on, d.Width, d.Height, "");
 
     float const a{settings.angle * 0.017453293f};
     float const constants[12]{static_cast<float>(d.Width), static_cast<float>(d.Height), 0.5f * settings.centre_px, settings.bezel_px,
                               plane, std::cos(a), std::sin(a), settings.curve,
                               settings.zoom, settings.offset_y, settings.calibrate, 0.f};
-    ID3D11DeviceContext * & ctx{frame.ctx};
-    device->GetImmediateContext(&ctx);
-    ID3D11DeviceContext1 * & ctx1{frame.ctx1};
-    if(ctx)
-      ctx->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void **>(&ctx1));
-    if(ctx1)
-      {
-      // the game's whole state set aside and put back as it was (one call each way)
-      ID3DDeviceContextState * & game{frame.game};
-      // swapped from before the call: a fault within it after the swap still gives the game its state back
-      frame.swapped = true;
-      ctx1->SwapDeviceContextState(gpu.state, &game);
-      ctx1->CopyResource(gpu.copy, picture);
-      ctx1->UpdateSubresource(gpu.constants, 0, nullptr, constants, 0, 0);
-      D3D11_VIEWPORT const port{0.f, 0.f, static_cast<float>(d.Width), static_cast<float>(d.Height), 0.f, 1.f};
-      ctx1->OMSetRenderTargets(1, &target, nullptr);
-      ctx1->RSSetViewports(1, &port);
-      ctx1->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-      ctx1->VSSetShader(gpu.vs, nullptr, 0);
-      ctx1->PSSetShader(gpu.ps, nullptr, 0);
-      ctx1->PSSetShaderResources(0, 1, &gpu.copy_view);
-      ctx1->PSSetSamplers(0, 1, &gpu.sampler);
-      ctx1->PSSetConstantBuffers(0, 1, &gpu.constants);
-      ctx1->Draw(3, 0);
-      ID3D11ShaderResourceView * const none{};
-      ctx1->PSSetShaderResources(0, 1, &none);
-      ID3D11RenderTargetView * const no_target{};
-      ctx1->OMSetRenderTargets(1, &no_target, nullptr);
-      ctx1->SwapDeviceContextState(game, nullptr);
-      frame.swapped = false;
-      release(game);
-      release(ctx1);
-      }
+    // the game's whole state set aside and put back as it was (one call each way)
+    ID3DDeviceContextState * & game{frame.game};
+    // swapped from before the call: a fault within it after the swap still gives the game its state back
+    frame.swapped = true;
+    ctx1->SwapDeviceContextState(gpu.state, &game);
+    if(test_fault_at(test_fault_e::correction))
+      RaiseException(EXCEPTION_ACCESS_VIOLATION, 0, 0, nullptr);  // the test's: a fault with the plugin's state in place
+    ctx1->CopyResource(gpu.copy, picture);
+    ctx1->UpdateSubresource(gpu.constants, 0, nullptr, constants, 0, 0);
+    D3D11_VIEWPORT const port{0.f, 0.f, static_cast<float>(d.Width), static_cast<float>(d.Height), 0.f, 1.f};
+    ctx1->OMSetRenderTargets(1, &target, nullptr);
+    ctx1->RSSetViewports(1, &port);
+    ctx1->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ctx1->VSSetShader(gpu.vs, nullptr, 0);
+    ctx1->PSSetShader(gpu.ps, nullptr, 0);
+    ctx1->PSSetShaderResources(0, 1, &gpu.copy_view);
+    ctx1->PSSetSamplers(0, 1, &gpu.sampler);
+    ctx1->PSSetConstantBuffers(0, 1, &gpu.constants);
+    ctx1->Draw(3, 0);
+    ID3D11ShaderResourceView * const none{};
+    ctx1->PSSetShaderResources(0, 1, &none);
+    ID3D11RenderTargetView * const no_target{};
+    ctx1->OMSetRenderTargets(1, &no_target, nullptr);
+    ctx1->SwapDeviceContextState(game, nullptr);
+    frame.swapped = false;
+    release(game);
+    release(ctx1);
     release(ctx);
     release(target);
     }
 
   ///\brief after a fault in correct(), under a guard of its own: the game's state given back when the plugin's was in
-  /// its place (the plugin's views unbound first, so its state holds no reference to the picture), what the frame
-  /// held let go, and the device's objects released (the correction is off for the session). A fault here leaves the
-  /// rest as it was, said in the log by the guard
+  /// its place (the plugin's views unbound first, so its state holds no reference to the picture) and what the frame
+  /// held let go. The device's objects (gpu) are kept: the correction is off for the session, so nothing uses them
+  /// again, and another thread's Present still within correct() may (one reference to the device and a few small
+  /// objects until the game ends; none of them holds the swap chain's buffer). A fault here leaves the rest as it was,
+  /// said in the log by the guard
   auto clean_up_after_fault() -> void
     {
     bool const swapped{frame.swapped and frame.ctx1 and frame.game};
@@ -285,9 +300,9 @@ namespace edwide
     release(frame.ctx);
     release(frame.target);
     release(frame.picture);
+    release(frame.device1);
     release(frame.device);
-    release_gpu();
-    log_line("correction: after the fault {}the picture and the device's objects let go", swapped ? "the game's state given back, " : "");
+    log_line("correction: after the fault {}the picture let go (the device's objects kept)", swapped ? "the game's state given back, " : "");
     }
 
   auto correction_off() noexcept -> bool

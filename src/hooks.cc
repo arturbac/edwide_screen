@@ -111,6 +111,8 @@ namespace edwide
     {
     if(not device or not factory_once.first())
       return;
+    if(test_fault_at(test_fault_e::hook))
+      RaiseException(EXCEPTION_ACCESS_VIOLATION, 0, 0, nullptr);  // the test's: a fault before anything was hooked
     IDXGIDevice * dxgi_device{};
     IDXGIAdapter * adapter{};
     IDXGIFactory * factory{};

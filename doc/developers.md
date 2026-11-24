@@ -19,7 +19,7 @@ cut there, never thrown); a wide string goes in as
 The settings are one table, `settings_table` in `settings_log.cc`: each setting's name, field, group, whether it is
 read at the start or while the game runs, its range, its help (the ini's comment) and a note for the doc only.
 `make_ini` writes a new ini from it (only when there is none: `CREATE_NEW`, a file not written whole taken away
-again), `read_ini` reads by its names, and `write_settings_doc` makes `doc/settings.md` from it through
+again, one that cannot be made said with its error: `settings: ... cannot be made (error N); the defaults`), `read_ini` reads by its names, and `write_settings_doc` makes `doc/settings.md` from it through
 edplugin_common's `settings_doc`: change the table, then the doc with `tools/doc.sh` (below).
 
 - `src/entry.cc`: a small chain element of edloader's. It exports `D3D11CreateDevice` and
@@ -46,8 +46,9 @@ edplugin_common's `settings_doc`: change the table, then the doc with `tools/doc
   target view are taken and let go within the call, so the game's `ResizeBuffers` never meets a reference of
   edwide_screen's; its own copy is made again when the size or format changes. A `Present1` that calls `Present`
   inside is corrected once (a depth per thread).
-- Each change of state is one log line: `on`, `on again`, `off: <why>` (wings 0, no layout, another size, no field of
-  view, a multisampled picture, objects not made).
+- Each change of state (or of its reason) is one log line: `on`, `on again`, `off: <why>` (wings 0, no layout, another size, no field of
+  view, a multisampled picture, objects not made, no device or picture from the swap chain, a context without
+  `ID3D11DeviceContext1`; the context is taken before `on` is said, so a missing one is a state, not a line a frame).
 - Faults: the plugin's code runs under edplugin_common's guard (`guard/guard.h`), which catches a fault of the
   processor or a C++ exception and logs it (a fault with its place, `<what> at <module>+0x<offset>`; a C++ exception
   with its text); the original calls (the game's `Present`, the next d3d11, the factory's own methods) never run under
@@ -55,15 +56,20 @@ edplugin_common's `settings_doc`: change the table, then the doc with `tools/doc
   `<part>: off for this session (...)`:
   - `correction`, the correction at each Present (`depth` counted outside it). After a fault its handler gives the
     game its context state back when edwide_screen's was in its place (its views unbound first), lets go of what the
-    frame held (the picture, its view, the context, the device; each noted in the thread's `frame_t` while held,
+    frame held (the picture, its view, the context, the device and `make_gpu`'s `ID3D11Device1`; each noted in the thread's `frame_t` while held,
     since without `/EHa` a destructor in the frames a fault leaves runs or not; a field is cleared before its
-    `Release`, so nothing is let go twice), releases the device's objects, and logs `correction: after the fault ...`.
+    `Release`, so nothing is let go twice), keeps the device's objects (nothing uses them again, and a Present of
+    another thread still in the correction may; a reference to the device and a few small objects, none holding the
+    swap chain's buffer, until the game ends), and logs `correction: after the fault ...`.
     The game's `Present` is still called, and `build_info` says `correction off`. The handler calls d3d11 again right after a fault that may have been in
     d3d11; a fault in the handler is caught by a guard of its own and logged, and what is left stays held.
   - `hook`, putting the hooks in place: the factory at `D3D11CreateDevice` and Present on each swap chain made
-    through the hooked factory. After a fault no swap chain gets Present hooked, and `build_info` says `hook 0`.
+    through the hooked factory. After a fault no swap chain is hooked (one of a class already hooked keeps its
+    correction: the table is the class's), and `build_info` says `hook off`.
 
-  The start (`start()`, once) runs under `run_guarded`: a fault is the line `start: <what> ...; nothing is hooked`.
+  The start (`start()`, once) runs under `run_guarded`: a fault is the line `start: <what> ...; nothing is hooked`,
+  and `build_info` says `start off`. `hook 0` is only the setting `wings_hook = 0`; the order `build_info` looks at
+  them: start off, hook off, hook 0, correction off, wings off.
 - The arithmetic (`src/wings_math.h`, the shader the same): the plane the middle monitor's picture stands in is `D`
   pixels from the eye - the eyes' own distance (`wings_eye_cm x wings_center_px / wings_center_cm`) when set, as the
   sides must go on from the middle as the eyes see it whatever the game's field of view; else the distance that field
@@ -114,8 +120,11 @@ edplugin_common's `settings_doc`: change the table, then the doc with `tools/doc
   each side's pixel the colour of where `wings_math.h` says it comes from (within 3 of 255), angle 0 and wings 0 change
   nothing, `ResizeBuffers` to another size is not refused and that size passes untouched with its log line, the right
   size turns it on again, `wings_calibrate = 0` leaves no trace of the shapes. Leaves `grid.bmp`, `grid_30.bmp` and
-  `calibrate_20/30/40.bmp` to look at. Then a run with `wings_hook = 0` and, last, `tools/doc.sh`. No test makes a
-  fault: the guard's paths are checked by edplugin_common's own test.
+  `calibrate_20/30/40.bmp` to look at. Then a run with `wings_hook = 0`, three runs with the test's fault (the export
+  `edwide_screen_test_fault`, armed by `EDWIDE_TEST_FAULT=start|hook|correction` of the test's program, not read by
+  the plugin: Proton passes the environment on to the game): the picture as it was, `build_info`'s word, the guard's
+  lines, and for `correction` (after the plugin's state took the game's place) the game's viewport given back; last,
+  `tools/doc.sh`.
 - The calibration (`calibration()` in the shader) is drawn in the picture's own pixels, before the sides are laid:
   the shapes stand on the middle monitor's plane carried on, so they are right on the monitors exactly when the
   angle and the eyes' distance are; the line is a pixel and a half of the monitor wide wherever it is.
