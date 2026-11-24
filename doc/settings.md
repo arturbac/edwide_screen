@@ -7,7 +7,7 @@ In `edwide_screen.ini`, in `edloader\config` (beside the dll without edloader); 
 
 - **Read while the game runs**: edwide_screen looks at the ini when the game shows a frame, at most once a second, and reads it again when the file was saved since; the log has the values read (`settings: ...`).
 - **Read at the game's start**: a change takes a new start of the game.
-- **Range**: the values that make sense; *(clamped)* = edwide_screen holds the value to it, elsewhere it does not check.
+- **Range**: the values that make sense; *(clamped)* = edwide_screen holds the value to it, elsewhere it does not check; empty = any value.
 
 ## Turning it on
 
@@ -44,7 +44,7 @@ None.
 |---|---|---|---|
 | `wings_eye_cm` | `0` | used when it and wings_center_cm are above 0 | your eyes' distance from the middle monitor, cm (with wings_center_cm: the sides as seen from there; 0 = from the field of view) |
 | `wings_center_cm` | `0` | used when it and wings_eye_cm are above 0 | the middle monitor's picture width, cm (0 = from the field of view) |
-| `wings_fov` | `0` | used above 0; works between 1 and 179 | only without wings_eye_cm: the game's vertical field of view, degrees; 0 = read from the game's Settings.xml |
+| `wings_fov` | `0` | used above 0; works between 1 and 179 | only without wings_eye_cm: the game's vertical field of view, degrees; 0 = read from the game's Settings.xml; used unless wings_eye_cm and wings_center_cm are both above 0 |
 
 ### Read at the game's start (a change needs a restart)
 

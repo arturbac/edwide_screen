@@ -41,7 +41,9 @@ namespace edwide
     };
 
   ///\brief what one frame's correction holds while it runs, each set when taken and cleared when let go, so that after
-  /// a fault (no destructor run without /EHa) clean_up_after_fault lets go of what is left
+  /// a fault clean_up_after_fault lets go of what is left: without /EHa a destructor in the frames the fault leaves
+  /// runs or not (edplugin_common's guard.h), and a field cleared before its Release is never let go twice. One a
+  /// thread, as a frame's correction runs on the thread of its Present
   struct frame_t
     {
     ID3D11Device * device;
@@ -54,7 +56,7 @@ namespace edwide
     };
 
   gpu_t gpu{};
-  constinit frame_t frame{};
+  constinit thread_local frame_t frame{};
   state_e state{state_e::unknown};
   UINT told_width{}, told_height{};
   std::atomic<bool> hooked{};
@@ -63,19 +65,21 @@ namespace edwide
   // the correction under edplugin_common's guard: the first fault turns it off for the session
   constinit edplugin_common::guard_t correction_guard{"correction", 1};
 
+  ///\brief `u` cleared, then let go: a fault in its Release leaves nothing to let go twice
   auto release(IUnknown * & u) noexcept -> void
     {
-    if(u)
-      u->Release();
+    IUnknown * const held{u};
     u = nullptr;
+    if(held)
+      held->Release();
     }
 
   template<typename T>
   auto release(T * & p) noexcept -> void
     {
-    IUnknown * u{p};
-    release(u);
+    IUnknown * held{p};
     p = nullptr;
+    release(held);
     }
 
   auto release_gpu() noexcept -> void
@@ -232,8 +236,9 @@ namespace edwide
       {
       // the game's whole state set aside and put back as it was (one call each way)
       ID3DDeviceContextState * & game{frame.game};
-      ctx1->SwapDeviceContextState(gpu.state, &game);
+      // swapped from before the call: a fault within it after the swap still gives the game its state back
       frame.swapped = true;
+      ctx1->SwapDeviceContextState(gpu.state, &game);
       ctx1->CopyResource(gpu.copy, picture);
       ctx1->UpdateSubresource(gpu.constants, 0, nullptr, constants, 0, 0);
       D3D11_VIEWPORT const port{0.f, 0.f, static_cast<float>(d.Width), static_cast<float>(d.Height), 0.f, 1.f};

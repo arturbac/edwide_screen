@@ -7,13 +7,15 @@
   place of its own table. The ini and the log's settings lines stay as they were. `tools/doc.sh` checks the ini, the
   log's lines on wrong ones and the doc with no device and no drawing; `tools/test.sh` runs it last.
 - Faults are caught by edplugin_common's guard: in the correction, in putting the hooks in place (now also the Present
-  hook of a swap chain made through the hooked factory, which before had no handler) and in the start. A fault is
-  logged with its place (`<module>+0x<offset>`) in two lines, `<part>: ... (1 of 1)` and `<part>: off for this session`
-  (before, one line with the exception's code, 0 for a C++ exception). After a fault in the correction the game gets
-  its context state back and the picture, the plugin's views and objects are let go (before, a fault there could
-  leave them held).
-- A new `edwide_screen.ini` not written whole is taken away again and said in the log; "made" is logged only for a
-  file written whole.
+  hook of a swap chain made through the hooked factory, which before had no handler) and in the start. A fault in the
+  correction or the hooks is logged with its place (`<module>+0x<offset>`; a C++ exception with its text) in two
+  lines, `<part>: ... (1 of 1)` and `<part>: off for this session`; before, the correction logged one line with the
+  exception's code (0 for a C++ exception), the hooks one line without it. A fault in the start is one line
+  `start: ...; nothing is hooked` (before, none). After a fault in the correction the game gets its context state
+  back when the plugin's was in its place, the picture and the plugin's views and objects are let go, and a third
+  line says so (before, a fault there could leave them held).
+- A new `edwide_screen.ini` not written whole is taken away again through its own handle and said in the log with the
+  bytes written; "made" is logged only for a file written whole.
 - Built with edplugin_common at its commit with the modules `guard` and `settings_doc` (8af49e9).
 - The folders, the ini's and the game's settings' reading are edplugin_common's: an `edwide_screen.ini` or the game's
   `Settings.xml` that is there but cannot be read leaves the settings (or the field of view) as they were, with a

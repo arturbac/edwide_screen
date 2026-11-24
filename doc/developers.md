@@ -49,15 +49,17 @@ edplugin_common's `settings_doc`: change the table, then the doc with `tools/doc
 - Each change of state is one log line: `on`, `on again`, `off: <why>` (wings 0, no layout, another size, no field of
   view, a multisampled picture, objects not made).
 - Faults: the plugin's code runs under edplugin_common's guard (`guard/guard.h`), which catches a fault of the
-  processor or a C++ exception and logs where it was (`<module>+0x<offset>`); the original calls (the game's
-  `Present`, the next d3d11, the factory's own methods) never run under it. Two parts, each off for the session after
-  its first fault, with two log lines `<part>: <what> at <module>+0x<offset> (1 of 1)` and `<part>: off for this
-  session (...)`:
+  processor or a C++ exception and logs it (a fault with its place, `<what> at <module>+0x<offset>`; a C++ exception
+  with its text); the original calls (the game's `Present`, the next d3d11, the factory's own methods) never run under
+  it. Two parts, each off for the session after its first fault, with two log lines `<part>: <the fault> (1 of 1)` and
+  `<part>: off for this session (...)`:
   - `correction`, the correction at each Present (`depth` counted outside it). After a fault its handler gives the
     game its context state back when edwide_screen's was in its place (its views unbound first), lets go of what the
-    frame held (the picture, its view, the context, the device; each noted in `frame_t` while held, since no
-    destructor runs after a fault without `/EHa`), releases the device's objects, and logs `correction: after the
-    fault ...`. The game's `Present` is still called.
+    frame held (the picture, its view, the context, the device; each noted in the thread's `frame_t` while held,
+    since without `/EHa` a destructor in the frames a fault leaves runs or not; a field is cleared before its
+    `Release`, so nothing is let go twice), releases the device's objects, and logs `correction: after the fault ...`.
+    The game's `Present` is still called. The handler calls d3d11 again right after a fault that may have been in
+    d3d11; a fault in the handler is caught by a guard of its own and logged, and what is left stays held.
   - `hook`, putting the hooks in place: the factory at `D3D11CreateDevice` and Present on each swap chain made
     through the hooked factory. After a fault no swap chain gets Present hooked, and `build_info` says `hook 0`.
 

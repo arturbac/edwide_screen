@@ -33,6 +33,8 @@ namespace edwide
       diagnostics
       };
 
+    static_assert(std::size(groups) == static_cast<std::size_t>(group_e::diagnostics) + 1, "a name for each group");
+
     using edplugin_common::setting_read_e;
 
     ///\brief one setting: read from the ini by its field, written to a new ini by its help and default, and listed in
@@ -76,7 +78,8 @@ namespace edwide
       {"wings_center_cm"sv, &settings_t::centre_cm, group_e::distance, live, "used when it and wings_eye_cm are above 0"sv,
        "the middle monitor's picture width, cm (0 = from the field of view)"sv},
       {"wings_fov"sv, &settings_t::fov, group_e::distance, live, "used above 0; works between 1 and 179"sv,
-       "only without wings_eye_cm: the game's vertical field of view, degrees; 0 = read from the game's Settings.xml"sv},
+       "only without wings_eye_cm: the game's vertical field of view, degrees; 0 = read from the game's Settings.xml"sv,
+       "used unless wings_eye_cm and wings_center_cm are both above 0"sv},
       {"wings_zoom"sv, &settings_t::zoom, group_e::look, live, "0.25..4 (clamped)"sv,
        "the sides' size: above 1 larger (less black at the corners, more cut off)"sv},
       {"wings_curve"sv, &settings_t::curve, group_e::look, live, "0..1 (clamped)"sv, "0 flat side monitors .. 1 curved ones"sv},
@@ -168,20 +171,24 @@ namespace edwide
       text += line;
       }
     // CREATE_NEW: a player's ini is never written over, also one made between the look above and this
-    HANDLE const f{CreateFileW(ini_path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    HANDLE const f{CreateFileW(ini_path.c_str(), GENERIC_WRITE | DELETE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
     if(f == INVALID_HANDLE_VALUE)
       return;
     DWORD written{};
-    bool const whole{WriteFile(f, text.data(), static_cast<DWORD>(text.size()), &written, nullptr) != FALSE and written == text.size()};
-    DWORD const error{whole ? 0 : GetLastError()};
-    CloseHandle(f);
-    if(not whole)
+    bool const wrote{WriteFile(f, text.data(), static_cast<DWORD>(text.size()), &written, nullptr) != FALSE};
+    DWORD const error{wrote ? 0 : GetLastError()};
+    if(not wrote or written != text.size())
       {
-      // the file made here, not whole: taken away, so the next start makes it again
-      DeleteFileW(ini_path.c_str());
-      log_line("settings: {} could not be written whole (error {}); not made", wide(ini_path), error);
+      // the file made here, not whole: taken away through its own handle before it is closed (no other file can be
+      // met by its name), so the next start makes it again
+      FILE_DISPOSITION_INFO gone{TRUE};
+      bool const taken_away{SetFileInformationByHandle(f, FileDispositionInfo, &gone, sizeof gone) != FALSE};
+      CloseHandle(f);
+      log_line("settings: {} not written whole ({} of {} bytes, error {}); {}", wide(ini_path), written, text.size(), error,
+               taken_away ? "taken away" : "left as it is");
       return;
       }
+    CloseHandle(f);
     log_line("settings: {} made, all its lines comments", wide(ini_path));
     }
 
@@ -216,7 +223,7 @@ namespace edwide
       "and reads it again when the file was saved since; the log has the values read (`settings: ...`).\n"
       "- **Read at the game's start**: a change takes a new start of the game.\n"
       "- **Range**: the values that make sense; *(clamped)* = edwide_screen holds the value to it, elsewhere it does not "
-      "check.\n"sv,
+      "check; empty = any value.\n"sv,
       groups};
     edplugin_common::settings_doc_result_t const r{edplugin_common::write_settings_doc(L"EDWIDE_SETTINGS_DOC", doc, rows)};
     switch(r.status)
