@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The start, the hooking and the correction run under edplugin_common's guard: a fault there, or a C++ exception, is
+  logged with its kind and, for a hardware fault, its place (`<module>+0x<offset>`) and turns that part off for the session as before; the
+  library's locks the faulted code held are let go, and a fault in another module (the system, a driver) turns the
+  part off at once. A fault at the start, before only an exception, is now logged too.
 - The folders, the ini's and the game's settings' reading are edplugin_common's: an `edwide_screen.ini` or the game's
   `Settings.xml` that is there but cannot be read leaves the settings (or the field of view) as they were, with a
   line in the log (before, an unreadable ini was read as an empty one, so the settings went back to their defaults);
