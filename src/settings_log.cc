@@ -1,39 +1,90 @@
 // edwide - what edwide_screen's parts share: the log, the settings (edwide_screen.ini) and the game's field of view.
 #include "runtime.h"
 
+#include <edplugin_common/settings/settings_doc.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <string_view>
+#include <vector>
+
+using namespace std::string_view_literals;
 
 namespace edwide
   {
   HMODULE self{};
   std::wstring config_dir, log_dir;
 
-  struct key_t
+  namespace
     {
-    char const * name;
-    float settings_t::*field;
-    char const * help;
-    };
+    ///\brief the topics of doc/settings.md, in its order
+    constexpr std::string_view groups[]{"Turning it on"sv, "The monitors"sv, "The distance"sv, "The look"sv,
+                                        "Calibration and diagnostics"sv};
 
-  key_t const keys[]{
-    {"wings_hook", &settings_t::hook, "read when the game starts: 1 = the hook in place; 0 = nothing hooked (the calls only passed on), to tell whether another mod is disturbed by it"},
-    {"wings", &settings_t::wings, "1 = the sides laid over monitors set at an angle; 0 = off"},
-    {"wings_angle", &settings_t::angle, "the side monitors' angle towards you, degrees (0 = in one line with the middle)"},
-    {"wings_center_px", &settings_t::centre_px, "the middle monitor's width in pixels of the game's picture; 0 = not set (off)"},
-    {"wings_side_px", &settings_t::side_px, "each side monitor's width in pixels; 0 = the rest of the picture (any width)"},
-    {"wings_bezel_px", &settings_t::bezel_px, "pixels of the picture behind the bezels between the middle and a side (0 = none)"},
-    {"wings_eye_cm", &settings_t::eye_cm, "your eyes' distance from the middle monitor, cm (with wings_center_cm: the sides as seen from there; 0 = from the field of view)"},
-    {"wings_center_cm", &settings_t::centre_cm, "the middle monitor's picture width, cm (0 = from the field of view)"},
-    {"wings_fov", &settings_t::fov, "only without wings_eye_cm: the game's vertical field of view, degrees; 0 = read from the game's Settings.xml"},
-    {"wings_zoom", &settings_t::zoom, "the sides' size: above 1 larger (less black at the corners, more cut off)"},
-    {"wings_curve", &settings_t::curve, "0 flat side monitors .. 1 curved ones"},
-    {"wings_offset_y", &settings_t::offset_y, "the sides moved up (-) or down (+), pixels"},
-    {"wings_calibrate", &settings_t::calibrate, "1 = shapes to set the angle by: circles, squares and rows across the monitors' edges, round, square and straight from where you sit when wings_angle is right"},
-  };
+    enum struct group_e : std::size_t
+      {
+      turning_on,
+      monitors,
+      distance,
+      look,
+      diagnostics
+      };
+
+    using edplugin_common::setting_read_e;
+
+    ///\brief one setting: read from the ini by its field, written to a new ini by its help and default, and listed in
+    /// doc/settings.md with its group, when it is read, its range and, after the help, `doc_note`
+    struct setting_t
+      {
+      std::string_view name;
+      float settings_t::* field;
+      group_e group;
+      setting_read_e read;
+      ///\brief the values that make sense, "(clamped)" where read_ini holds the value to them; empty = any
+      std::string_view range;
+      std::string_view help;
+      ///\brief for doc/settings.md only, after the help and "; " (the ini's comments stay as they are)
+      std::string_view doc_note{};
+      };
+
+    constexpr auto live{setting_read_e::live};
+    constexpr auto at_start{setting_read_e::at_start};
+
+    // every setting once, in the order a new ini gets them: read_ini takes its names from here, make_ini its comments
+    // and doc/settings.md its rows (tools/doc.sh checks the ini against test/data and the doc against doc/settings.md)
+    constexpr setting_t settings_table[]{
+      {"wings_hook"sv, &settings_t::hook, group_e::diagnostics, at_start, "0.5 or above = on"sv,
+       "read when the game starts: 1 = the hook in place; 0 = nothing hooked (the calls only passed on), to tell whether another mod is disturbed by it"sv},
+      {"wings"sv, &settings_t::wings, group_e::turning_on, live, "0.5 or above = on"sv,
+       "1 = the sides laid over monitors set at an angle; 0 = off"sv},
+      {"wings_angle"sv, &settings_t::angle, group_e::monitors, live, "-80..80 (clamped)"sv,
+       "the side monitors' angle towards you, degrees (0 = in one line with the middle)"sv},
+      {"wings_center_px"sv, &settings_t::centre_px, group_e::monitors, live, "0 or less = off"sv,
+       "the middle monitor's width in pixels of the game's picture; 0 = not set (off)"sv, "e.g. 3000 of a picture 9000 wide"sv},
+      {"wings_side_px"sv, &settings_t::side_px, group_e::monitors, live,
+       "above 0: the picture's width must be wings_center_px + 2 x (wings_side_px + wings_bezel_px)"sv,
+       "each side monitor's width in pixels; 0 = the rest of the picture (any width)"sv,
+       "when set, a picture of another width is left alone"sv},
+      {"wings_bezel_px"sv, &settings_t::bezel_px, group_e::monitors, live, ""sv,
+       "pixels of the picture behind the bezels between the middle and a side (0 = none)"sv,
+       "only when the graphics driver adds them"sv},
+      {"wings_eye_cm"sv, &settings_t::eye_cm, group_e::distance, live, "used when it and wings_center_cm are above 0"sv,
+       "your eyes' distance from the middle monitor, cm (with wings_center_cm: the sides as seen from there; 0 = from the field of view)"sv},
+      {"wings_center_cm"sv, &settings_t::centre_cm, group_e::distance, live, "used when it and wings_eye_cm are above 0"sv,
+       "the middle monitor's picture width, cm (0 = from the field of view)"sv},
+      {"wings_fov"sv, &settings_t::fov, group_e::distance, live, "used above 0; works between 1 and 179"sv,
+       "only without wings_eye_cm: the game's vertical field of view, degrees; 0 = read from the game's Settings.xml"sv},
+      {"wings_zoom"sv, &settings_t::zoom, group_e::look, live, "0.25..4 (clamped)"sv,
+       "the sides' size: above 1 larger (less black at the corners, more cut off)"sv},
+      {"wings_curve"sv, &settings_t::curve, group_e::look, live, "0..1 (clamped)"sv, "0 flat side monitors .. 1 curved ones"sv},
+      {"wings_offset_y"sv, &settings_t::offset_y, group_e::look, live, ""sv, "the sides moved up (-) or down (+), pixels"sv},
+      {"wings_calibrate"sv, &settings_t::calibrate, group_e::diagnostics, live, "above 0.5 = on"sv,
+       "1 = shapes to set the angle by: circles, squares and rows across the monitors' edges, round, square and straight from where you sit when wings_angle is right"sv},
+    };
+    }  // namespace
 
   settings_t settings{};
   std::wstring ini_path;
@@ -78,7 +129,7 @@ namespace edwide
         };
       std::string const key{trim(line.substr(0, eq))}, value{trim(line.substr(eq + 1))};
       bool known{};
-      for(key_t const & k: keys)
+      for(setting_t const & k: settings_table)
         if(key == k.name)
           {
           known = true;
@@ -110,7 +161,7 @@ namespace edwide
     std::string text{"; edwide_screen: the sides of the game's picture laid over side monitors set at an angle (README.md)\r\n"
                      "; a line without ';' sets a value; read again within a second of a change\r\n"};
     settings_t const d{};
-    for(key_t const & k: keys)
+    for(setting_t const & k: settings_table)
       {
       char line[256];
       format_into(line, "; {}\r\n;{} = {:g}\r\n", k.help, k.name, double(d.*k.field));
@@ -123,6 +174,63 @@ namespace edwide
     WriteFile(f, text.data(), static_cast<DWORD>(text.size()), &written, nullptr);
     CloseHandle(f);
     log_line("settings: {} made, all its lines comments", wide(ini_path));
+    }
+
+  auto write_settings_doc() -> bool
+    {
+    settings_t const d{};
+    std::vector<std::string> values;  // the rows' views stay on these
+    values.reserve(std::size(settings_table));
+    std::vector<std::string> abouts;
+    abouts.reserve(std::size(settings_table));
+    std::vector<edplugin_common::setting_row_t> rows;
+    rows.reserve(std::size(settings_table));
+    for(setting_t const & setting: settings_table)
+      {
+      char value[32];
+      format_into(value, "{:g}", double(d.*setting.field));
+      values.emplace_back(value);
+      std::string about{setting.help};
+      if(not setting.doc_note.empty())
+        (about += "; "sv) += setting.doc_note;
+      abouts.push_back(std::move(about));
+      rows.push_back({setting.name, values.back(), static_cast<std::size_t>(setting.group), setting.read, setting.range, abouts.back()});
+      }
+    constexpr edplugin_common::settings_doc_t doc{
+      "edwide_screen settings"sv,
+      "edwide_screen from its table of settings (src/settings_log.cc, `EDWIDE_SETTINGS_DOC`)"sv,
+      "In `edwide_screen.ini`, in `edloader\\config` (beside the dll without edloader); edwide_screen makes it at the "
+      "game's first start with every setting as a comment, so the correction is off until it is set. A line without `;` "
+      "sets a value (`;` and `#` start a comment).\n"
+      "\n"
+      "- **Read while the game runs**: edwide_screen looks at the ini when the game shows a frame, at most once a second, "
+      "and reads it again when the file was saved since; the log has the values read (`settings: ...`).\n"
+      "- **Read at the game's start**: a change takes a new start of the game.\n"
+      "- **Range**: the values that make sense; *(clamped)* = edwide_screen holds the value to it, elsewhere it does not "
+      "check.\n"sv,
+      groups};
+    edplugin_common::settings_doc_result_t const r{edplugin_common::write_settings_doc(L"EDWIDE_SETTINGS_DOC", doc, rows)};
+    switch(r.status)
+      {
+      case edplugin_common::settings_doc_status_e::not_asked:
+        return true;
+      case edplugin_common::settings_doc_status_e::written:
+        log_line("settings: the settings' doc written to {}", wide(r.path));
+        return true;
+      case edplugin_common::settings_doc_status_e::path_too_long:
+        log_line("settings: the settings' doc not written: its path is 260 characters or longer ({}...)", wide(r.path));
+        break;
+      case edplugin_common::settings_doc_status_e::invalid:
+        log_line("settings: the settings' doc not written: {}", edplugin_common::settings_doc_error_name(r.error));
+        break;
+      case edplugin_common::settings_doc_status_e::cannot_open:
+        log_line("settings: the settings' doc {} cannot be made (error {})", wide(r.path), r.system_error);
+        break;
+      case edplugin_common::settings_doc_status_e::write_failed:
+        log_line("settings: writing the settings' doc {} failed (error {})", wide(r.path), r.system_error);
+        break;
+      }
+    return false;
     }
 
   ///\brief the game's vertical field of view from its Settings.xml (`<FOV>`), read again when the file changes

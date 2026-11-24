@@ -163,9 +163,10 @@ extern "C" __declspec(dllexport) auto edwide_screen_hooked() -> int
   return hooked.load() ? 1 : 0;
   }
 
-///\brief for tools/doc.sh, not for the game: the log and the ini as at the game's start; no hook and no d3d11 call.
-/// 0 when done; 1 after a fault or a C++ exception (in the log, with the open lock let go by the guard); 2, doing
-/// nothing, once the game's start has begun (a call in the game)
+///\brief for tools/doc.sh, not for the game: the log and the ini as at the game's start, then doc/settings.md to the
+/// file EDWIDE_SETTINGS_DOC names; no hook and no d3d11 call. 0 when done; 1 after a fault or a C++ exception (in the
+/// log, with the open lock let go by the guard); 2, doing nothing, once the game's start has begun (a call in the
+/// game); 3 when the doc was asked and not written (in the log)
 extern "C" __declspec(dllexport) auto WINAPI edwide_screen_write_settings_doc() noexcept -> int
   {
   if(game_started.load(std::memory_order_acquire))
@@ -173,9 +174,16 @@ extern "C" __declspec(dllexport) auto WINAPI edwide_screen_write_settings_doc() 
     log_line("settings: edwide_screen_write_settings_doc after the game's start: nothing done (it is for tools/doc.sh)");
     return 2;
     }
+  int result{1};
   edplugin_common::fault_t fault;
-  if(edplugin_common::run_guarded([] { open_log_and_ini_once(); }, fault))
-    return 0;
+  if(edplugin_common::run_guarded(
+       [&result]
+         {
+         open_log_and_ini_once();
+         result = write_settings_doc() ? 0 : 3;
+         },
+       fault))
+    return result;
   char text[320];
   log_line("settings: edwide_screen_write_settings_doc: {}", edplugin_common::fault_line(fault, text));
   return 1;

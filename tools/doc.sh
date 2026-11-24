@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # edwide_screen's settings without the game, with no device and no drawing: test/doc_app.cc under wine calls the
-# plugin's export edwide_screen_write_settings_doc, which makes the log and the ini as at the game's start. Checked: a
-# fresh ini is test/data/fresh.ini; an ini already there is left byte for byte as it was; an ini of wrong lines
-# (test/data/bad.ini) gives read_ini's log lines test/data/bad_log.txt.
+# plugin's export edwide_screen_write_settings_doc, which makes the log and the ini as at the game's start and, with
+# EDWIDE_SETTINGS_DOC set, doc/settings.md. Checked: a fresh ini is test/data/fresh.ini; an ini already there is left
+# byte for byte as it was; an ini of wrong lines (test/data/bad.ini) gives read_ini's log lines test/data/bad_log.txt;
+# the doc is doc/settings.md, and each setting of the ini is a row of the doc with the same default.
 # Usage: tools/doc.sh <build dir> <scratch dir>; environment: EDWIDE_WINEPREFIX (a wine prefix kept between runs),
 # WINE_COMMON_TIMEOUT (seconds for one wine run, 600 unless set). Needs edplugin_common cloned in the checkout (its
 # tools/wine-common.sh). tools/test.sh runs it too.
 set -euo pipefail
-# the shell's environment would move the runs' files out of their folders: edloader's folders for the ini and the log
-unset EDLOADER_CONFIG_DIR EDLOADER_LOG_DIR
+# the shell's environment would move the runs' files out of their folders: edloader's folders for the ini and the
+# log, and the doc's file, set below for the doc's run only
+unset EDLOADER_CONFIG_DIR EDLOADER_LOG_DIR EDWIDE_SETTINGS_DOC
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 COMMON=$HERE/edplugin_common/tools/wine-common.sh
 [[ -f $COMMON ]] || { echo "$0: no $COMMON; in $HERE:" \
@@ -53,6 +55,22 @@ settings_lines bad | cmp -s - "$HERE/test/data/bad_log.txt"
 check $? "bad: read_ini's log lines are test/data/bad_log.txt"
 cmp -s "$RUN/bad/edwide_screen.ini" "$HERE/test/data/bad.ini"
 check $? "bad: the ini there is left as it was"
+mkdir "$RUN/doc"
+cp "$BUILD/edwide_screen.dll" "$BUILD/edwide_doc.exe" "$RUN/doc/"
+wine_common_run "$RUN/doc" "$RUN/doc/out.txt" EDWIDE_SETTINGS_DOC=settings.md -- edwide_doc.exe
+check $? "doc: the export ran"
+cmp -s "$RUN/doc/settings.md" "$HERE/doc/settings.md"
+same=$?
+check $same "doc: doc/settings.md up to date with the table"
+[[ $same -eq 0 ]] || echo "    to bring it up to date: cp '$RUN/doc/settings.md' '$HERE/doc/settings.md'"
+# the ini's settings with their defaults (";name = value") and the doc's rows ("| `name` | `value` |"), each sorted,
+# are the same pairs
+diff <(sed -n 's/^;\([a-z_0-9]*\) = \([^\r]*\)\r*$/\1=\2/p' "$RUN/fresh/edwide_screen.ini" | sort) \
+     <(sed -n 's/^| `\([a-z_0-9]*\)` | `\([^`]*\)` |.*/\1=\2/p' "$RUN/doc/settings.md" | sort) > /dev/null
+check $? "doc: every setting of the ini a row of the doc with its default, and no other"
+count=$(grep -c '^;[a-z_0-9]* = ' "$RUN/fresh/edwide_screen.ini")
+[[ $count -eq 13 ]]
+check $? "doc: 13 settings ($count)"
 set -e
 echo "=== doc: $([[ $rc -eq 0 ]] && echo PASSED || echo FAILED) (run directory $RUN)"
 exit $rc
