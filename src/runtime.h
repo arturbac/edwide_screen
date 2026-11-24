@@ -6,7 +6,9 @@
 #include <dxgi1_2.h>
 
 #include <edplugin_common/core/lock.h>
+#include <edplugin_common/file/file.h>
 #include <edplugin_common/log/log.h>
+#include <edplugin_common/paths/paths.h>
 #include <edplugin_common/text/format.h>
 
 #include <atomic>
@@ -51,6 +53,9 @@ namespace edwide
   using edplugin_common::shared_lock_t;
   using edplugin_common::wide;
   using edplugin_common::wide_t;
+  // the files and folders are edplugin_common's
+  using edplugin_common::read_text;
+  using edplugin_common::write_time;
   // the log is edplugin_common's: edwide_screen.log, cut at 2 KB a line, the last session's set aside in the folder
   // edwide_screen beside it
   using edplugin_common::log_is_open;
@@ -77,8 +82,6 @@ namespace edwide
     return format_into(&buf[0], size, fmt, std::forward<args_t>(args)...);
     }
 
-  ///\brief a folder edloader hands its plugins (EDLOADER_CONFIG_DIR, EDLOADER_LOG_DIR); without edloader, the dll's own
-  auto directory_from(wchar_t const * variable) -> std::wstring;
   ///\brief the ini with every setting as a comment, when there is none
   auto make_ini() -> void;
   auto look_at_files() -> void;

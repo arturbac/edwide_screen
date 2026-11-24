@@ -12,45 +12,6 @@ namespace edwide
   HMODULE self{};
   std::wstring config_dir, log_dir;
 
-  ///\brief a folder edloader hands its plugins (EDLOADER_CONFIG_DIR, EDLOADER_LOG_DIR); without edloader, the dll's own
-  auto directory_from(wchar_t const * variable) -> std::wstring
-    {
-    wchar_t value[MAX_PATH]{};
-    DWORD const n{GetEnvironmentVariableW(variable, value, MAX_PATH)};
-    if(n != 0 and n < MAX_PATH)
-      return std::wstring{value, n};
-    wchar_t path[MAX_PATH]{};
-    GetModuleFileNameW(self, path, MAX_PATH);
-    std::wstring dir{path};
-    if(auto const slash{dir.find_last_of(L"\\/")}; slash != std::wstring::npos)
-      dir.resize(slash);
-    return dir;
-    }
-
-  auto write_time(std::wstring const & path) noexcept -> ULONGLONG
-    {
-    WIN32_FILE_ATTRIBUTE_DATA a{};
-    if(not GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &a))
-      return 0;
-    return (static_cast<ULONGLONG>(a.ftLastWriteTime.dwHighDateTime) << 32) | a.ftLastWriteTime.dwLowDateTime;
-    }
-
-  auto read_text(std::wstring const & path) -> std::string
-    {
-    std::string text;
-    HANDLE const f{CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
-                               FILE_ATTRIBUTE_NORMAL, nullptr)};
-    if(f == INVALID_HANDLE_VALUE)
-      return text;
-    char buf[4096];
-    DWORD got{};
-    while(ReadFile(f, buf, sizeof buf, &got, nullptr) and got != 0)
-      text.append(buf, got);
-    CloseHandle(f);
-    return text;
-    }
-
-
   struct key_t
     {
     char const * name;
@@ -85,7 +46,19 @@ namespace edwide
   auto read_ini() -> void
     {
     settings_t s{};
-    std::string const text{read_text(ini_path)};
+    std::optional<std::string> const read{read_text(ini_path)};
+    static bool told_unreadable{};
+    if(not read)
+      {
+      // read again at the next look (its time forgotten), said once until it is read
+      ini_written = 0;
+      if(not told_unreadable)
+        log_line("settings: {} could not be read; the settings stay as they were", wide(ini_path));
+      told_unreadable = true;
+      return;
+      }
+    told_unreadable = false;
+    std::string const & text{*read};
     std::size_t at{};
     while(at < text.size())
       {
@@ -155,7 +128,19 @@ namespace edwide
   ///\brief the game's vertical field of view from its Settings.xml (`<FOV>`), read again when the file changes
   auto read_game_fov() -> void
     {
-    std::string const text{read_text(game_settings_path)};
+    std::optional<std::string> const read{read_text(game_settings_path)};
+    static bool told_unreadable{};
+    if(not read)
+      {
+      // read again at the next look (its time forgotten), said once until it is read
+      game_settings_written = 0;
+      if(not told_unreadable)
+        log_line("game: {} could not be read; the field of view stays {:g} degrees", wide(game_settings_path), double(game_fov));
+      told_unreadable = true;
+      return;
+      }
+    told_unreadable = false;
+    std::string const & text{*read};
     auto const at{text.find("<FOV>")};
     float const fov{at == std::string::npos ? 0.f : std::strtof(text.c_str() + at + 5, nullptr)};
     if(fov != game_fov)

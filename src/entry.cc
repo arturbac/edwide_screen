@@ -18,8 +18,9 @@ namespace edwide
   {
   auto start() -> void
     {
-    config_dir = directory_from(L"EDLOADER_CONFIG_DIR");
-    log_dir = directory_from(L"EDLOADER_LOG_DIR");
+    // the folders edloader hands its plugins; without edloader, the dll's own
+    config_dir = edplugin_common::plugin_dir(edplugin_common::edloader_config_dir_variable, self);
+    log_dir = edplugin_common::plugin_dir(edplugin_common::edloader_log_dir_variable, self);
     log_open(log_dir, L"edwide_screen");  // edplugin_common's: the last session's log set aside in edwide_screen\ beside it
     log_line("edwide_screen {}", EDWIDE_VERSION);
     log_line("edplugin_common {}", EDPLUGIN_COMMON_COMMIT);

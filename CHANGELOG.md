@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The folders, the ini's and the game's settings' reading are edplugin_common's: an `edwide_screen.ini` or the game's
+  `Settings.xml` that is there but cannot be read leaves the settings (or the field of view) as they were, with a
+  line in the log (before, an unreadable ini was read as an empty one, so the settings went back to their defaults);
+  a folder from edloader or a path of the dll over 259 characters is taken whole (before, the dll's folder or a cut
+  path).
 - The log is edplugin_common's: the last session's `edwide_screen.log` is moved to `edwide_screen\edwide_screen.<UTC>.log` beside it at
   the start (before, each start emptied it), and a line is cut at 2 KB (before, 1 KB).
 - Built with edplugin_common 1.0.0, the library the plugins share: a clone in the plugin's directory on the commit
