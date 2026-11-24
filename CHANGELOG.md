@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- `edwide_screen.ini` is read, completed and watched by edplugin_common's module `ini` (1669a91), by the same rules
+  as edupscale's and edworld's ini. A value that works today works the same:
+  - an ini that is there gets the settings it does not name yet added at its end as comments (before, it was never
+    added to); the player's lines stay byte for byte, and the lines added take the file's own line ends;
+  - the log's notes name the line (`settings: line N: ...`); a line without `=` is said too (before, passed over
+    without a word);
+  - `wings_guides`, taken out for `wings_calibrate` before the first release, is said once a session as `no longer a
+    setting (now wings_calibrate)` (before, `a typo?`);
+  - the ini taken away while the game runs leaves the settings as they are, said once (before, the defaults until
+    it was back); `wings_hook` changed while the game runs is said once (it is read at the game's start);
+  - an ini saved as UTF-16 is neither read nor added to, said once in the log (save it as UTF-8);
+  - a new ini has an empty line before each setting's comment.
+- Lines that now take effect: the first line of an ini saved with a UTF-8 byte order mark (before, its key was taken
+  for no setting).
+- The game's `Settings.xml` taken away while the game runs keeps the field of view as it was (before, 0 until it was
+  back).
 - doc/developers.md moved out of the repository, to the developers' notes kept apart from the plugins; the README no
   longer links it.
 - After a fault in the correction the device's objects are kept (before, let go: another thread's Present still in

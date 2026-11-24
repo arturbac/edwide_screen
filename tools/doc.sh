@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # edwide_screen's settings without the game, with no device and no drawing: test/doc_app.cc under wine calls the
 # plugin's export edwide_screen_write_settings_doc, which makes the log and the ini as at the game's start and, with
-# EDWIDE_SETTINGS_DOC set, doc/settings.md. Checked: a fresh ini is test/data/fresh.ini; an ini already there is left
-# byte for byte as it was; an ini of wrong lines (test/data/bad.ini) gives read_ini's log lines test/data/bad_log.txt;
-# the doc is doc/settings.md, and each setting of the ini is a row of the doc with the same default.
+# EDWIDE_SETTINGS_DOC set, doc/settings.md. Checked: a fresh ini is test/data/fresh.ini; an ini already there keeps its
+# lines and gets the settings it does not name added at its end (test/data/kept_completed.ini); an ini of wrong lines
+# (test/data/bad.ini) gives the log lines test/data/bad_log.txt and is completed as test/data/bad_completed.ini; the
+# doc is doc/settings.md, and each setting of the ini is a row of the doc with the same default.
 # Usage: tools/doc.sh <build dir> <scratch dir>; environment: EDWIDE_WINEPREFIX (a wine prefix kept between runs),
 # WINE_COMMON_TIMEOUT (seconds for one wine run, 600 unless set). Needs edplugin_common cloned in the checkout (its
 # tools/wine-common.sh). tools/test.sh runs it too.
@@ -34,7 +35,7 @@ doc_run() {  # <name> [the ini in test/data]
   [[ $# -lt 2 ]] || cp "$HERE/test/data/$2" "$RUN/$1/edwide_screen.ini"
   wine_common_run "$RUN/$1" "$RUN/$1/out.txt" -- edwide_doc.exe
 }
-# read_ini's log lines: the log's settings lines without their time and without the ini's path
+# the settings' log lines: the log's settings lines without their time and without the ini's path
 settings_lines() {  # <case>
   grep 'settings: ' "$RUN/$1/edwide_screen.log" | cut -d' ' -f2- | grep -v '\.ini' | tr -d '\r'
 }
@@ -45,16 +46,18 @@ cmp -s "$RUN/fresh/edwide_screen.ini" "$HERE/test/data/fresh.ini"
 check $? "fresh: the ini is test/data/fresh.ini"
 doc_run kept kept.ini
 check $? "kept: the export ran"
-cmp -s "$RUN/kept/edwide_screen.ini" "$HERE/test/data/kept.ini"
-check $? "kept: the ini there is left as it was"
+cmp -s "$RUN/kept/edwide_screen.ini" "$HERE/test/data/kept_completed.ini"
+check $? "kept: the ini there keeps its lines, the settings it lacked added (test/data/kept_completed.ini)"
+head -c "$(stat -c %s "$HERE/test/data/kept.ini")" "$RUN/kept/edwide_screen.ini" | cmp -s - "$HERE/test/data/kept.ini"
+check $? "kept: the player's lines byte for byte at the start of the file"
 settings_lines kept | cmp -s - "$HERE/test/data/kept_log.txt"
-check $? "kept: read_ini's log lines are test/data/kept_log.txt"
+check $? "kept: the settings' log lines are test/data/kept_log.txt"
 doc_run bad bad.ini
 check $? "bad: the export ran"
 settings_lines bad | cmp -s - "$HERE/test/data/bad_log.txt"
-check $? "bad: read_ini's log lines are test/data/bad_log.txt"
-cmp -s "$RUN/bad/edwide_screen.ini" "$HERE/test/data/bad.ini"
-check $? "bad: the ini there is left as it was"
+check $? "bad: the settings' log lines are test/data/bad_log.txt"
+cmp -s "$RUN/bad/edwide_screen.ini" "$HERE/test/data/bad_completed.ini"
+check $? "bad: the ini completed is test/data/bad_completed.ini"
 mkdir "$RUN/doc"
 cp "$BUILD/edwide_screen.dll" "$BUILD/edwide_doc.exe" "$RUN/doc/"
 wine_common_run "$RUN/doc" "$RUN/doc/out.txt" EDWIDE_SETTINGS_DOC=settings.md -- edwide_doc.exe
@@ -63,12 +66,12 @@ cmp -s "$RUN/doc/settings.md" "$HERE/doc/settings.md"
 same=$?
 check $same "doc: doc/settings.md up to date with the table"
 [[ $same -eq 0 ]] || echo "    to bring it up to date: cp '$RUN/doc/settings.md' '$HERE/doc/settings.md'"
-# the ini's settings with their defaults (";name = value") and the doc's rows ("| `name` | `value` |"), each sorted,
-# are the same pairs
-diff <(sed -n 's/^;\([a-z_0-9]*\) = \([^\r]*\)\r*$/\1=\2/p' "$RUN/fresh/edwide_screen.ini" | sort) \
-     <(sed -n 's/^| `\([a-z_0-9]*\)` | `\([^`]*\)` |.*/\1=\2/p' "$RUN/doc/settings.md" | sort) > /dev/null
+# the ini's settings with their defaults (";name = value", ";name =" for an empty one) and the doc's rows ("| `name` |
+# `value` |", "| `name` | empty |"), each sorted, are the same pairs
+diff <(sed -n 's/^;\([a-z_0-9]*\) =[ ]\{0,1\}\([^\r]*\)\r*$/\1=\2/p' "$RUN/fresh/edwide_screen.ini" | sort) \
+     <(sed -n -e 's/^| `\([a-z_0-9]*\)` | `\([^`]*\)` |.*/\1=\2/p' -e 's/^| `\([a-z_0-9]*\)` | empty |.*/\1=/p' "$RUN/doc/settings.md" | sort) > /dev/null
 check $? "doc: every setting of the ini a row of the doc with its default, and no other"
-count=$(grep -c '^;[a-z_0-9]* = ' "$RUN/fresh/edwide_screen.ini")
+count=$(grep -c '^;[a-z_0-9]* =' "$RUN/fresh/edwide_screen.ini")
 [[ $count -eq 13 ]]
 check $? "doc: 13 settings ($count)"
 set -e

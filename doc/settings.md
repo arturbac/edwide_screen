@@ -1,12 +1,12 @@
 # edwide_screen settings
 
-<!-- Made by edwide_screen from its table of settings (src/settings_log.cc, `EDWIDE_SETTINGS_DOC`); tools/test.sh checks
-     it is up to date. Change the table, not this file. -->
+<!-- Made by edwide_screen from its table of settings (src/settings_log.cc, `EDWIDE_SETTINGS_DOC`); tools/test.sh or tools/doc.sh
+     checks it is up to date. Change the table, not this file. -->
 
-In `edwide_screen.ini`, in `edloader\config` (beside the dll without edloader); edwide_screen makes it at the game's first start with every setting as a comment, so the correction is off until it is set. A line without `;` sets a value (`;` and `#` start a comment).
+In `edwide_screen.ini`, in `edloader\config` (beside the dll without edloader); edwide_screen makes it at the game's first start with every setting as a comment, so the correction is off until it is set, and adds the settings a newer version brings at its end. A line without `;` sets a value (`;` and `#` start a comment, also after a value).
 
-- **Read while the game runs**: edwide_screen looks at the ini when the game shows a frame, at most once a second, and reads it again when the file was saved since; the log has the values read (`settings: ...`).
-- **Read at the game's start**: a change takes a new start of the game.
+- **Read while the game runs**: edwide_screen looks at the ini when the game shows a frame, at most once a second, and reads it again when the file was saved since; the log has the values read (`settings: ...`). A line taken out, or made a comment, gives the default back; the file taken away leaves the settings as they are.
+- **Read at the game's start**: a change takes a new start of the game (the log says so once).
 - **Range**: the values that make sense; *(clamped)* = edwide_screen holds the value to it, elsewhere it does not check; empty = any value.
 
 ## Turning it on

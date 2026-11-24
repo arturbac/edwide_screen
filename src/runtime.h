@@ -7,6 +7,7 @@
 
 #include <edplugin_common/core/lock.h>
 #include <edplugin_common/file/file.h>
+#include <edplugin_common/ini/live.h>
 #include <edplugin_common/log/log.h>
 #include <edplugin_common/paths/paths.h>
 #include <edplugin_common/text/format.h>
@@ -43,8 +44,9 @@ namespace edwide
 
   extern HMODULE self;
   extern std::wstring config_dir, log_dir;
-  extern settings_t settings;
-  extern std::wstring ini_path;
+  ///\brief the settings as the game's threads see them (edplugin_common's live.h): the start-only ones (wings_hook)
+  /// from any thread, the others on the render thread, where look_at_files publishes them
+  extern edplugin_common::live_settings_t<settings_t> live_settings;
   extern std::wstring game_settings_path;
   extern float game_fov;
 
@@ -82,14 +84,23 @@ namespace edwide
     return format_into(&buf[0], size, fmt, std::forward<args_t>(args)...);
     }
 
-  ///\brief the ini with every setting as a comment, when there is none
-  auto make_ini() -> void;
+  ///\brief the settings in use, through live_settings
+  [[nodiscard]]
+  inline auto settings() noexcept -> settings_t const &
+    {
+    return live_settings.get();
+    }
+
+  ///\brief the start's part of the ini (edplugin_common's ini.h): completed with the settings it does not name (a new
+  /// one with every setting as a comment), read, the notes logged, live_settings started
+  auto start_ini(std::wstring path) -> void;
   ///\brief doc/settings.md from the table of settings, to the file EDWIDE_SETTINGS_DOC names (nothing without it); false
   /// when it was asked and not written (in the log)
   [[nodiscard]]
   auto write_settings_doc() -> bool;
-  ///\brief the ini read now when it is there (the start's first read), its time noted for look_at_files
-  auto read_ini_now() -> void;
-  ///\brief the ini and the game's Settings.xml read again when they changed, looked at once a second at most
+  ///\brief the game's Settings.xml watched by look_at_files (its first look reads it)
+  auto start_game_settings(std::wstring path) -> void;
+  ///\brief the ini and the game's Settings.xml read again when they changed, looked at once a second at most; on the
+  /// render thread
   auto look_at_files() -> void;
   }  // namespace edwide

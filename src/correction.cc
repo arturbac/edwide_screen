@@ -109,7 +109,7 @@ namespace edwide
     told_height = height;
     if(now == state_e::on)
       log_line("{}: the picture {}x{}, the sides laid over the monitors at {:g} degrees, the eye {}", again ? "on again" : "on", width,
-               height, double(settings.angle), settings.eye_cm > 0.f and settings.centre_cm > 0.f ? "as set (wings_eye_cm)" : "by the field of view");
+               height, double(settings().angle), settings().eye_cm > 0.f and settings().centre_cm > 0.f ? "as set (wings_eye_cm)" : "by the field of view");
     else
       log_line("off: {}", why);
     }
@@ -171,7 +171,7 @@ namespace edwide
   auto correct(IDXGISwapChain * chain) -> void
     {
     look_at_files();
-    if(settings.wings < 0.5f)
+    if(settings().wings < 0.5f)
       return tell(state_e::off_setting, 0, 0, "wings = 0 in the ini");
     ID3D11Device * & device{frame.device};
     ID3D11Texture2D * & picture{frame.picture};
@@ -193,11 +193,11 @@ namespace edwide
     char why[192];
     if(d.SampleDesc.Count != 1)
       return tell(state_e::off_picture, d.Width, d.Height, "the picture is multisampled");
-    if(settings.centre_px <= 0.f)
+    if(settings().centre_px <= 0.f)
       return tell(state_e::off_layout, d.Width, d.Height, "wings_center_px is not set");
-    float const side{settings.side_px > 0.f ? settings.side_px : 0.5f * (static_cast<float>(d.Width) - settings.centre_px) - settings.bezel_px};
-    float const expected{settings.centre_px + 2.f * (side + settings.bezel_px)};
-    if(settings.side_px > 0.f and std::fabs(expected - static_cast<float>(d.Width)) > 0.5f)
+    float const side{settings().side_px > 0.f ? settings().side_px : 0.5f * (static_cast<float>(d.Width) - settings().centre_px) - settings().bezel_px};
+    float const expected{settings().centre_px + 2.f * (side + settings().bezel_px)};
+    if(settings().side_px > 0.f and std::fabs(expected - static_cast<float>(d.Width)) > 0.5f)
       {
       format_into(why, "the picture is {}x{}, the settings expect a width of {:.0f}", d.Width, d.Height, double(expected));
       return tell(state_e::off_size, d.Width, d.Height, why);
@@ -205,17 +205,17 @@ namespace edwide
     if(side <= 0.f)
       {
       format_into(why, "the picture is {}x{}, no room for the sides beside a middle of {:.0f}", d.Width, d.Height,
-                    double(settings.centre_px));
+                    double(settings().centre_px));
       return tell(state_e::off_size, d.Width, d.Height, why);
       }
     // the picture plane's distance from the eye: the eyes' own distance in pixels when it is set (the sides then go on
     // from the middle monitor as seen from there), else the one the game's field of view draws for
     float plane{};
-    if(settings.eye_cm > 0.f and settings.centre_cm > 0.f)
-      plane = settings.eye_cm * settings.centre_px / settings.centre_cm;
+    if(settings().eye_cm > 0.f and settings().centre_cm > 0.f)
+      plane = settings().eye_cm * settings().centre_px / settings().centre_cm;
     else
       {
-      float const fov{settings.fov > 0.f ? settings.fov : game_fov};
+      float const fov{settings().fov > 0.f ? settings().fov : game_fov};
       if(not(fov > 1.f and fov < 179.f))
         return tell(state_e::off_fov, d.Width, d.Height, "no distance: wings_eye_cm and wings_center_cm not set, and no field of view");
       plane = wings_plane(fov, static_cast<float>(d.Height));
@@ -242,10 +242,10 @@ namespace edwide
       }
     tell(state_e::on, d.Width, d.Height, "");
 
-    float const a{settings.angle * 0.017453293f};
-    float const constants[12]{static_cast<float>(d.Width), static_cast<float>(d.Height), 0.5f * settings.centre_px, settings.bezel_px,
-                              plane, std::cos(a), std::sin(a), settings.curve,
-                              settings.zoom, settings.offset_y, settings.calibrate, 0.f};
+    float const a{settings().angle * 0.017453293f};
+    float const constants[12]{static_cast<float>(d.Width), static_cast<float>(d.Height), 0.5f * settings().centre_px, settings().bezel_px,
+                              plane, std::cos(a), std::sin(a), settings().curve,
+                              settings().zoom, settings().offset_y, settings().calibrate, 0.f};
     // the game's whole state set aside and put back as it was (one call each way)
     ID3DDeviceContextState * & game{frame.game};
     // swapped from before the call: a fault within it after the swap still gives the game its state back

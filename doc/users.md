@@ -82,6 +82,9 @@ Each setting with its default, its range and whether a change applies at once or
 
 - It is off until it is set in `edwide_screen.ini`. Changes in the file apply while the game runs (all but
   `wings_hook`, read when the game starts).
+- A newer edwide_screen adds its new settings at the end of the ini, as comments; your lines stay as they are. A line
+  it cannot read is in the log (`settings: line N: ...`), and that setting keeps its default, unless an earlier line
+  of the file set it.
 - When the game's picture has another size than the one set (the game in a window on the middle monitor, a
   launcher), edwide_screen leaves it alone. It comes back on by itself when the size is right again.
 - With edworld, edworld's `build_info` corner shows a line `edwide_screen <version> wings <angle> deg` (or `wings

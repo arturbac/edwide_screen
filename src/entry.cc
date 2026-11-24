@@ -29,9 +29,7 @@ namespace edwide
     log_open(log_dir, L"edwide_screen");  // edplugin_common's: the last session's log set aside in edwide_screen\ beside it
     log_line("edwide_screen {}", EDWIDE_VERSION);
     log_line("edplugin_common {}", EDPLUGIN_COMMON_COMMIT);
-    ini_path = config_dir + L"\\edwide_screen.ini";
-    make_ini();
-    read_ini_now();
+    start_ini(config_dir + L"\\edwide_screen.ini");
     }
 
   SRWLOCK open_lock = SRWLOCK_INIT;
@@ -63,8 +61,9 @@ namespace edwide
       game_settings_path = std::wstring{local} + L"\\Frontier Developments\\Elite Dangerous\\Options\\Graphics\\Settings.xml";
       CoTaskMemFree(local);
       }
+    start_game_settings(game_settings_path);
     look_at_files();
-    hook_at_start = settings.hook >= 0.5f;
+    hook_at_start = settings().hook >= 0.5f;
     if(not hook_at_start)
       log_line("hook: wings_hook = 0: nothing is hooked this session (the calls only passed on)");
     }
@@ -162,9 +161,9 @@ extern "C" __declspec(dllexport) auto edwide_screen_build_info(char * text, int 
     return static_cast<int>(format_into(text, static_cast<std::size_t>(size), "edwide_screen {} hook 0", EDWIDE_VERSION));
   if(correction_off())
     return static_cast<int>(format_into(text, static_cast<std::size_t>(size), "edwide_screen {} correction off", EDWIDE_VERSION));
-  if(settings.wings < 0.5f)
+  if(settings().wings < 0.5f)
     return static_cast<int>(format_into(text, static_cast<std::size_t>(size), "edwide_screen {} wings off", EDWIDE_VERSION));
-  return static_cast<int>(format_into(text, static_cast<std::size_t>(size), "edwide_screen {} wings {:g} deg", EDWIDE_VERSION, double(settings.angle)));
+  return static_cast<int>(format_into(text, static_cast<std::size_t>(size), "edwide_screen {} wings {:g} deg", EDWIDE_VERSION, double(settings().angle)));
   }
 
 ///\brief for the test: 1 once a swap chain's Present is hooked
