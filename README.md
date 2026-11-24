@@ -10,6 +10,6 @@ ones turned towards the player**, without stretched edges.
 - **Needs:** edloader. Works with or without edworld.
 - **Tried on:** Linux, Proton (DXVK), three 4K monitors. Windows: not tried yet.
 
-**Install and set up:** [doc/users.md](doc/users.md)
+**Install and set up:** [doc/users.md](doc/users.md) · **All settings:** [doc/settings.md](doc/settings.md)
 
 For developers: [doc/developers.md](doc/developers.md) · License: MIT ([LICENSE](LICENSE))

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- The settings are one table in the code: the ini made from it, read by it, and `doc/settings.md` made from it (each
+  setting's default, range and whether a change applies at once or at the next start); `doc/users.md` links it in
+  place of its own table. The ini and the log's settings lines stay as they were. `tools/doc.sh` checks the ini, the
+  log's lines on wrong ones and the doc with no device and no drawing; `tools/test.sh` runs it last.
+- Faults are caught by edplugin_common's guard: in the correction, in putting the hooks in place (now also the Present
+  hook of a swap chain made through the hooked factory, which before had no handler) and in the start. A fault is
+  logged with its place (`<module>+0x<offset>`) in two lines, `<part>: ... (1 of 1)` and `<part>: off for this session`
+  (before, one line with the exception's code, 0 for a C++ exception). After a fault in the correction the game gets
+  its context state back and the picture, the plugin's views and objects are let go (before, a fault there could
+  leave them held).
+- A new `edwide_screen.ini` not written whole is taken away again and said in the log; "made" is logged only for a
+  file written whole.
+- Built with edplugin_common at its commit with the modules `guard` and `settings_doc` (8af49e9).
 - The folders, the ini's and the game's settings' reading are edplugin_common's: an `edwide_screen.ini` or the game's
   `Settings.xml` that is there but cannot be read leaves the settings (or the field of view) as they were, with a
   line in the log (before, an unreadable ini was read as an empty one, so the settings went back to their defaults);

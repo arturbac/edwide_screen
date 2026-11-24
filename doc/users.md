@@ -75,21 +75,8 @@ example that is 25 degrees. A wider one shows more, as it does now.
 
 ## All settings
 
-| setting | default | what |
-|---|---|---|
-| `wings` | `0` | `1` = on |
-| `wings_center_px` | `0` | the middle monitor's width in pixels of the game's picture (e.g. 3000 of 9000); `0` = off |
-| `wings_side_px` | `0` | each side monitor's width in pixels; when set, a picture of another width is left alone; `0` = the rest of the picture, any width |
-| `wings_bezel_px` | `0` | pixels hidden behind the bezels between the middle and a side, when the driver adds them |
-| `wings_angle` | `30` | the side monitors' angle towards the player, degrees (0 = in one line with the middle) |
-| `wings_eye_cm` | `0` | the distance from the eyes to the middle monitor, cm |
-| `wings_center_cm` | `0` | the middle monitor's picture width, cm; with `wings_eye_cm`, the sides are laid as seen from the eyes |
-| `wings_fov` | `0` | only when the two above are not set: the game's vertical field of view; `0` = read from the game's `Settings.xml` |
-| `wings_zoom` | `1` | the sides' size: above 1 is larger (less black at the outer corners, more cut off) |
-| `wings_curve` | `0` | `0` = flat side monitors .. `1` = curved |
-| `wings_offset_y` | `0` | moves the sides down (+) or up (-), pixels |
-| `wings_calibrate` | `0` | `1` = show the calibration's shapes; `0` = none |
-| `wings_hook` | `1` | read when the game starts; `0` = edwide_screen does nothing (only to tell whether it disturbs another mod) |
+Each setting with its default, its range and whether a change applies at once or at the next start:
+[settings.md](settings.md).
 
 ## Good to know
 
