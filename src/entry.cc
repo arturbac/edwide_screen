@@ -75,13 +75,12 @@ namespace edwide
       &start_once,
       [](PINIT_ONCE, PVOID, PVOID *) -> BOOL
         {
-        __try
-          {
-          [] { try { start(); } catch(...) { log_line("start: an exception; nothing is hooked"); hook_at_start = false; } }();
-          }
-        __except(EXCEPTION_EXECUTE_HANDLER)
+        edplugin_common::fault_t fault;
+        if(not edplugin_common::run_guarded([] { start(); }, fault))
           {
           hook_at_start = false;
+          char text[320];
+          log_line("start: {}; nothing is hooked", edplugin_common::fault_line(fault, text));
           }
         return TRUE;
         },
@@ -101,17 +100,13 @@ namespace edwide
     {
     if(not hook_at_start)
       return;
-    __try
-      {
-      hook_factory_of(device);
-      if(chain)
-        hook_chain(chain);
-      }
-    __except(EXCEPTION_EXECUTE_HANDLER)
-      {
-      log_line("hook: a fault while hooking; nothing more is hooked");
-      hook_at_start = false;
-      }
+    hook_guarded(
+      [device, chain]
+        {
+        hook_factory_of(device);
+        if(chain)
+          hook_chain(chain);
+        });
     }
   }  // namespace edwide
 

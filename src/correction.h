@@ -6,7 +6,7 @@
 namespace edwide
   {
   extern std::atomic<bool> hooked;
-  extern bool hook_at_start;
+  extern std::atomic<bool> hook_at_start;
   extern thread_local int depth;
 
   auto guarded(IDXGISwapChain * chain) noexcept -> void;

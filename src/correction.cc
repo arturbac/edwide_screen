@@ -6,6 +6,8 @@
 #include "wings_ps.h"
 #include "wings_vs.h"
 
+#include <edplugin_common/guard/guard.h>
+
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -21,8 +23,7 @@ namespace edwide
     off_layout,
     off_size,
     off_fov,
-    off_picture,
-    broken
+    off_picture
     };
 
   struct gpu_t
@@ -39,12 +40,28 @@ namespace edwide
     DXGI_FORMAT copy_format{};
     };
 
+  ///\brief what one frame's correction holds while it runs, each set when taken and cleared when let go, so that after
+  /// a fault (no destructor run without /EHa) clean_up_after_fault lets go of what is left
+  struct frame_t
+    {
+    ID3D11Device * device;
+    ID3D11Texture2D * picture;
+    ID3D11RenderTargetView * target;
+    ID3D11DeviceContext * ctx;
+    ID3D11DeviceContext1 * ctx1;
+    ID3DDeviceContextState * game;  ///< the game's state, set aside while the plugin's is in place
+    bool swapped;                   ///< the plugin's state in place of the game's
+    };
+
   gpu_t gpu{};
+  constinit frame_t frame{};
   state_e state{state_e::unknown};
   UINT told_width{}, told_height{};
   std::atomic<bool> hooked{};
-  bool hook_at_start{true};
+  std::atomic<bool> hook_at_start{true};
   thread_local int depth{};
+  // the correction under edplugin_common's guard: the first fault turns it off for the session
+  constinit edplugin_common::guard_t correction_guard{"correction", 1};
 
   auto release(IUnknown * & u) noexcept -> void
     {
@@ -145,23 +162,19 @@ namespace edwide
     look_at_files();
     if(settings.wings < 0.5f)
       return tell(state_e::off_setting, 0, 0, "wings = 0 in the ini");
-    ID3D11Device * device{};
-    if(FAILED(chain->GetDevice(__uuidof(ID3D11Device), reinterpret_cast<void **>(&device))) or not device)
-      return;
-    ID3D11Texture2D * picture{};
-    chain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void **>(&picture));
+    ID3D11Device * & device{frame.device};
+    ID3D11Texture2D * & picture{frame.picture};
     struct held_t
       {
-      ID3D11Device * & d;
-      ID3D11Texture2D * & p;
       ~held_t()
         {
-        if(p)
-          p->Release();
-        if(d)
-          d->Release();
+        release(frame.picture);
+        release(frame.device);
         }
-      } const held{device, picture};
+      } const held{};
+    if(FAILED(chain->GetDevice(__uuidof(ID3D11Device), reinterpret_cast<void **>(&device))) or not device)
+      return;
+    chain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void **>(&picture));
     if(not picture)
       return;
     D3D11_TEXTURE2D_DESC d{};
@@ -198,25 +211,29 @@ namespace edwide
       }
     if(not make_gpu(device, d))
       return tell(state_e::off_picture, d.Width, d.Height, "the device's objects or the picture's copy could not be made");
-    ID3D11RenderTargetView * target{};
+    ID3D11RenderTargetView * & target{frame.target};
     if(FAILED(device->CreateRenderTargetView(picture, nullptr, &target)) or not target)
+      {
+      release(target);
       return tell(state_e::off_picture, d.Width, d.Height, "the picture cannot be drawn into");
+      }
     tell(state_e::on, d.Width, d.Height, "");
 
     float const a{settings.angle * 0.017453293f};
     float const constants[12]{static_cast<float>(d.Width), static_cast<float>(d.Height), 0.5f * settings.centre_px, settings.bezel_px,
                               plane, std::cos(a), std::sin(a), settings.curve,
                               settings.zoom, settings.offset_y, settings.calibrate, 0.f};
-    ID3D11DeviceContext * ctx{};
+    ID3D11DeviceContext * & ctx{frame.ctx};
     device->GetImmediateContext(&ctx);
-    ID3D11DeviceContext1 * ctx1{};
+    ID3D11DeviceContext1 * & ctx1{frame.ctx1};
     if(ctx)
       ctx->QueryInterface(__uuidof(ID3D11DeviceContext1), reinterpret_cast<void **>(&ctx1));
     if(ctx1)
       {
       // the game's whole state set aside and put back as it was (one call each way)
-      ID3DDeviceContextState * game{};
+      ID3DDeviceContextState * & game{frame.game};
       ctx1->SwapDeviceContextState(gpu.state, &game);
+      frame.swapped = true;
       ctx1->CopyResource(gpu.copy, picture);
       ctx1->UpdateSubresource(gpu.constants, 0, nullptr, constants, 0, 0);
       D3D11_VIEWPORT const port{0.f, 0.f, static_cast<float>(d.Width), static_cast<float>(d.Height), 0.f, 1.f};
@@ -234,48 +251,47 @@ namespace edwide
       ID3D11RenderTargetView * const no_target{};
       ctx1->OMSetRenderTargets(1, &no_target, nullptr);
       ctx1->SwapDeviceContextState(game, nullptr);
-      if(game)
-        game->Release();
-      ctx1->Release();
+      frame.swapped = false;
+      release(game);
+      release(ctx1);
       }
-    if(ctx)
-      ctx->Release();
-    target->Release();
+    release(ctx);
+    release(target);
     }
 
-  auto correct_caught(IDXGISwapChain * chain) -> bool
+  ///\brief after a fault in correct(), under a guard of its own: the game's state given back when the plugin's was in
+  /// its place (the plugin's views unbound first, so its state holds no reference to the picture), what the frame
+  /// held let go, and the device's objects released (the correction is off for the session). A fault here leaves the
+  /// rest as it was, said in the log by the guard
+  auto clean_up_after_fault() -> void
     {
-    try
+    bool const swapped{frame.swapped and frame.ctx1 and frame.game};
+    if(swapped)
       {
-      correct(chain);
-      return true;
+      ID3D11ShaderResourceView * const none{};
+      frame.ctx1->PSSetShaderResources(0, 1, &none);
+      ID3D11RenderTargetView * const no_target{};
+      frame.ctx1->OMSetRenderTargets(1, &no_target, nullptr);
+      frame.ctx1->SwapDeviceContextState(frame.game, nullptr);
       }
-    catch(...)
-      {
-      return false;
-      }
+    frame.swapped = false;
+    release(frame.game);
+    release(frame.ctx1);
+    release(frame.ctx);
+    release(frame.target);
+    release(frame.picture);
+    release(frame.device);
+    release_gpu();
+    log_line("correction: after the fault {}the picture and the device's objects let go", swapped ? "the game's state given back, " : "");
     }
 
   auto guarded(IDXGISwapChain * chain) noexcept -> void
     {
-    if(state == state_e::broken or depth != 0)
+    // depth outside the guard: a fault there would skip its decrement
+    if(depth != 0)
       return;
     ++depth;
-    bool ok{};
-    DWORD code{};
-    __try
-      {
-      ok = correct_caught(chain);
-      }
-    __except(code = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER)
-      {
-      ok = false;
-      }
+    static_cast<void>(correction_guard.run([chain] { correct(chain); }, [](edplugin_common::fault_t const &) { clean_up_after_fault(); }));
     --depth;
-    if(not ok)
-      {
-      state = state_e::broken;
-      log_line("off for this session: a fault in the correction (exception 0x{:08X}); the game goes on without it", as_unsigned(code));
-      }
     }
   }  // namespace edwide

@@ -2,6 +2,9 @@
 #pragma once
 
 #include "runtime.h"
+#include "correction.h"
+
+#include <edplugin_common/guard/guard.h>
 
 namespace edwide
   {
@@ -11,4 +14,14 @@ namespace edwide
   /// hooked in its table, once. The game's own factory, made when it likes, is of the same class (Windows' dxgi,
   /// DXVK's), so its swap chain comes through them; Present is hooked in that swap chain's table
   auto hook_factory_of(ID3D11Device * device) noexcept -> void;
+  ///\brief the guard of the hooks put in place (hook_chain and hook_factory_of, never an original call)
+  extern edplugin_common::guard_t hook_guard;
+
+  ///\brief `hook()` under hook_guard: the first fault turns the hooks off for the session (no swap chain gets Present
+  /// hooked after it) and hook_at_start false
+  template<typename hook_t>
+  auto hook_guarded(hook_t && hook) noexcept -> void
+    {
+    static_cast<void>(hook_guard.run(hook, [](edplugin_common::fault_t const &) noexcept { hook_at_start = false; }));
+    }
   }  // namespace edwide

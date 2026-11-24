@@ -3,6 +3,8 @@
 #include "hooks.h"
 #include "correction.h"
 
+#include <edplugin_common/core/once_flag.h>
+
 #include <initializer_list>
 
 namespace edwide
@@ -53,6 +55,8 @@ namespace edwide
   create_chain_fn orig_create_chain{};
   create_hwnd_fn orig_create_hwnd{};
   SRWLOCK chain_lock = SRWLOCK_INIT;
+  constinit edplugin_common::guard_t hook_guard{"hook", 1};
+  constinit edplugin_common::once_flag_t factory_once{};
 
   ///\brief a swap chain the game made: Present and Present1 hooked in its table, once a table
   auto hook_chain(IDXGISwapChain * chain) noexcept -> void
@@ -81,7 +85,10 @@ namespace edwide
     {
     HRESULT const hr{orig_create_chain(factory, device, desc, out)};
     if(SUCCEEDED(hr) and out)
-      hook_chain(*out);
+      {
+      IDXGISwapChain * const chain{*out};
+      hook_guarded([chain] { hook_chain(chain); });
+      }
     return hr;
     }
 
@@ -90,7 +97,10 @@ namespace edwide
     {
     HRESULT const hr{orig_create_hwnd(factory, device, window, desc, full, output, out)};
     if(SUCCEEDED(hr) and out)
-      hook_chain(*out);
+      {
+      IDXGISwapChain * const chain{*out};
+      hook_guarded([chain] { hook_chain(chain); });
+      }
     return hr;
     }
 
@@ -99,10 +109,8 @@ namespace edwide
   /// DXVK's), so its swap chain comes through them; Present is hooked in that swap chain's table
   auto hook_factory_of(ID3D11Device * device) noexcept -> void
     {
-    static bool done{};
-    if(done or not device)
+    if(not device or not factory_once.first())
       return;
-    done = true;
     IDXGIDevice * dxgi_device{};
     IDXGIAdapter * adapter{};
     IDXGIFactory * factory{};
