@@ -10,13 +10,18 @@
 #include "hooks.h"
 #include "edplugin_common_commit.h"
 
+#include <edplugin_common/guard/guard.h>
+
 #include <shlobj.h>
 
+#include <atomic>
 #include <string>
 
 namespace edwide
   {
-  auto start() -> void
+  ///\brief the folders, the log and the ini (made when there is none, then read): the part of the start the export
+  /// edwide_screen_write_settings_doc shares
+  auto open_log_and_ini() -> void
     {
     // the folders edloader hands its plugins; without edloader, the dll's own
     config_dir = edplugin_common::plugin_dir(edplugin_common::edloader_config_dir_variable, self);
@@ -26,6 +31,29 @@ namespace edwide
     log_line("edplugin_common {}", EDPLUGIN_COMMON_COMMIT);
     ini_path = config_dir + L"\\edwide_screen.ini";
     make_ini();
+    read_ini_now();
+    }
+
+  SRWLOCK open_lock = SRWLOCK_INIT;
+  bool opened{};                     ///< open_log_and_ini done, under open_lock
+  std::atomic<bool> game_started{};  ///< start() begun: the export does nothing after it
+
+  ///\brief open_log_and_ini once in the process, whether the game's start or the export comes first: one log, one
+  /// first read of the ini
+  auto open_log_and_ini_once() -> void
+    {
+    exclusive_lock_t const lock{open_lock};
+    if(opened)
+      return;
+    open_log_and_ini();
+    opened = true;
+    }
+
+  auto start() -> void
+    {
+    game_started.store(true, std::memory_order_release);
+    open_log_and_ini_once();
+    // the game's field of view: Settings.xml read by look_at_files below (the ini, read above, is not read again)
     PWSTR local{};
     if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &local)) and local)
       {
@@ -138,6 +166,24 @@ extern "C" __declspec(dllexport) auto edwide_screen_build_info(char * text, int 
 extern "C" __declspec(dllexport) auto edwide_screen_hooked() -> int
   {
   return hooked.load() ? 1 : 0;
+  }
+
+///\brief for tools/doc.sh, not for the game: the log and the ini as at the game's start; no hook and no d3d11 call.
+/// 0 when done; 1 after a fault or a C++ exception (in the log, with the open lock let go by the guard); 2, doing
+/// nothing, once the game's start has begun (a call in the game)
+extern "C" __declspec(dllexport) auto WINAPI edwide_screen_write_settings_doc() noexcept -> int
+  {
+  if(game_started.load(std::memory_order_acquire))
+    {
+    log_line("settings: edwide_screen_write_settings_doc after the game's start: nothing done (it is for tools/doc.sh)");
+    return 2;
+    }
+  edplugin_common::fault_t fault;
+  if(edplugin_common::run_guarded([] { open_log_and_ini_once(); }, fault))
+    return 0;
+  char text[320];
+  log_line("settings: edwide_screen_write_settings_doc: {}", edplugin_common::fault_line(fault, text));
+  return 1;
   }
 
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)

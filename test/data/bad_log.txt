@@ -1,0 +1,6 @@
+settings: 'wings_center_px = 3840px' cannot be read; wings_center_px stays as it was
+settings: 'wings_side_px = abc' cannot be read; wings_side_px stays as it was
+settings: 'wings_fov = inf' cannot be read; wings_fov stays as it was
+settings: 'wings_bezel_px = ' cannot be read; wings_bezel_px stays as it was
+settings: no setting 'wings_nosuch' (a typo?): ignored
+settings: wings 1, angle 80, centre 0 px, side 0 px, bezel 0 px, eye 0 cm, centre 0 cm, fov 0, zoom 0.25, curve 1, offset -12.5, calibrate 1

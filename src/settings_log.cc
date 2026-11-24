@@ -148,6 +148,14 @@ namespace edwide
     game_fov = fov;
     }
 
+  ///\brief the ini read now when it is there, its time noted for look_at_files
+  auto read_ini_now() -> void
+    {
+    ini_written = write_time(ini_path);
+    if(ini_written != 0)
+      read_ini();
+    }
+
   auto look_at_files() -> void
     {
     ULONGLONG const now{GetTickCount64()};

@@ -1,0 +1,1 @@
+settings: wings 1, angle 41.4, centre 3840 px, side 2580 px, bezel 0 px, eye 80 cm, centre 64 cm, fov 0, zoom 1, curve 0, offset 0, calibrate 0
