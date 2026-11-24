@@ -85,7 +85,8 @@ Each setting with its default, its range and whether a change applies at once or
 - When the game's picture has another size than the one set (the game in a window on the middle monitor, a
   launcher), edwide_screen leaves it alone. It comes back on by itself when the size is right again.
 - With edworld, edworld's `build_info` corner shows a line `edwide_screen <version> wings <angle> deg` (or `wings
-  off`): edwide_screen runs, and this is what it does now.
+  off`): edwide_screen runs, and this is what it does now. `correction off`: an error turned it off until the game
+  starts again; the log says where.
 - Cost on the graphics card: about 0.1 ms a frame at 9000x2160 (RX 7900 XTX, DXVK).
 - Tried with the game's picture 9000x2160 across three 4K monitors, edloader with EDHM and edworld in its list
   (Elite Dangerous Odyssey).

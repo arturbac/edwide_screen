@@ -290,6 +290,11 @@ namespace edwide
     log_line("correction: after the fault {}the picture and the device's objects let go", swapped ? "the game's state given back, " : "");
     }
 
+  auto correction_off() noexcept -> bool
+    {
+    return correction_guard.broken();
+    }
+
   auto guarded(IDXGISwapChain * chain) noexcept -> void
     {
     // depth outside the guard: a fault there would skip its decrement

@@ -13,7 +13,7 @@
   exception's code (0 for a C++ exception), the hooks one line without it. A fault in the start is one line
   `start: ...; nothing is hooked` (before, none). After a fault in the correction the game gets its context state
   back when the plugin's was in its place, the picture and the plugin's views and objects are let go, and a third
-  line says so (before, a fault there could leave them held).
+  line says so (before, a fault there could leave them held); edworld's `build_info` line then says `correction off`.
 - A new `edwide_screen.ini` not written whole is taken away again through its own handle and said in the log with the
   bytes written; "made" is logged only for a file written whole.
 - Built with edplugin_common at its commit with the modules `guard` and `settings_doc` (8af49e9).

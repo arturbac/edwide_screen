@@ -10,4 +10,7 @@ namespace edwide
   extern thread_local int depth;
 
   auto guarded(IDXGISwapChain * chain) noexcept -> void;
+  ///\brief the correction turned off for the session by a fault
+  [[nodiscard]]
+  auto correction_off() noexcept -> bool;
   }  // namespace edwide

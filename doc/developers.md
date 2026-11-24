@@ -58,7 +58,7 @@ edplugin_common's `settings_doc`: change the table, then the doc with `tools/doc
     frame held (the picture, its view, the context, the device; each noted in the thread's `frame_t` while held,
     since without `/EHa` a destructor in the frames a fault leaves runs or not; a field is cleared before its
     `Release`, so nothing is let go twice), releases the device's objects, and logs `correction: after the fault ...`.
-    The game's `Present` is still called. The handler calls d3d11 again right after a fault that may have been in
+    The game's `Present` is still called, and `build_info` says `correction off`. The handler calls d3d11 again right after a fault that may have been in
     d3d11; a fault in the handler is caught by a guard of its own and logged, and what is left stays held.
   - `hook`, putting the hooks in place: the factory at `D3D11CreateDevice` and Present on each swap chain made
     through the hooked factory. After a fault no swap chain gets Present hooked, and `build_info` says `hook 0`.
