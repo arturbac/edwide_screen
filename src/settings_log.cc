@@ -167,12 +167,21 @@ namespace edwide
       format_into(line, "; {}\r\n;{} = {:g}\r\n", k.help, k.name, double(d.*k.field));
       text += line;
       }
+    // CREATE_NEW: a player's ini is never written over, also one made between the look above and this
     HANDLE const f{CreateFileW(ini_path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
     if(f == INVALID_HANDLE_VALUE)
       return;
     DWORD written{};
-    WriteFile(f, text.data(), static_cast<DWORD>(text.size()), &written, nullptr);
+    bool const whole{WriteFile(f, text.data(), static_cast<DWORD>(text.size()), &written, nullptr) != FALSE and written == text.size()};
+    DWORD const error{whole ? 0 : GetLastError()};
     CloseHandle(f);
+    if(not whole)
+      {
+      // the file made here, not whole: taken away, so the next start makes it again
+      DeleteFileW(ini_path.c_str());
+      log_line("settings: {} could not be written whole (error {}); not made", wide(ini_path), error);
+      return;
+      }
     log_line("settings: {} made, all its lines comments", wide(ini_path));
     }
 
