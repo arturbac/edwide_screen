@@ -2,6 +2,11 @@
 
 ## How it works
 
+edwide_screen is a plain Windows dll for the game's DirectX 11. It takes the finished picture just before it is shown
+(after the game's upscaling and its HUD) and lays each side part over its monitor as the eye sees it through that
+monitor. Without it, at a field of view of about 130 degrees across, things near the outer edges are several times
+wider than they should be.
+
 The sources in `src/`, namespace `edwide`, each topic a `.cc` with its header of what the others use: `runtime.h`
 (the log, the settings, the game's field of view, in `settings_log.cc`), `correction` (the side parts laid over at
 each Present; `wings_math.h` its geometry), `hooks` (Present and the DXGI factory), and `entry.cc` (the exports, the
@@ -23,6 +28,9 @@ cut there, never thrown); a wide string goes in as
   of `IDXGISwapChain1`). No thread, no device, no factory and no window of its own: the first version's probe device
   ended the game at its start with EDHM in the list; the second's factory made on a thread of its own lost the race
   with the game's swap chain now and then, and EDHM's colours went wrong with it in the list.
+- The log's file of an earlier session: `edloader\logs\edwide_screen\edwide_screen.<UTC of its last write>.log`. Two
+  sessions ending in the same second share that name: the second then stays in `edwide_screen.log` and the new one
+  goes on after it.
 - `wings_hook = 0` (read at the start): the calls only passed on, nothing hooked, to tell whether another mod is
   disturbed by the hook or by the dll being there.
 - In the hook, before the original: the ini and the game's `Settings.xml` (`<FOV>`) looked at at most once a second;
