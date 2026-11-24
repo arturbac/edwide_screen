@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- doc/developers.md moved out of the repository, to the developers' notes kept apart from the plugins; the README no
+  longer links it.
 - After a fault in the correction the device's objects are kept (before, let go: another thread's Present still in
   the correction could have used them); the log's line says `the picture let go (the device's objects kept)`.
 - `build_info` tells a fault from the setting: `start off` (a fault in the start), `hook off` (a fault while hooking;
