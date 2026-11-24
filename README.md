@@ -12,4 +12,4 @@ ones turned towards the player**, without stretched edges.
 
 **Install and set up:** [doc/users.md](doc/users.md) · **All settings:** [doc/settings.md](doc/settings.md)
 
-For developers: [doc/developers.md](doc/developers.md) · License: MIT ([LICENSE](LICENSE))
+License: MIT ([LICENSE](LICENSE))
