@@ -6,6 +6,7 @@
 #include <dxgi1_2.h>
 
 #include <edplugin_common/core/lock.h>
+#include <edplugin_common/log/log.h>
 #include <edplugin_common/text/format.h>
 
 #include <atomic>
@@ -40,7 +41,6 @@ namespace edwide
 
   extern HMODULE self;
   extern std::wstring config_dir, log_dir;
-  extern HANDLE log_file;
   extern settings_t settings;
   extern std::wstring ini_path;
   extern std::wstring game_settings_path;
@@ -51,8 +51,12 @@ namespace edwide
   using edplugin_common::shared_lock_t;
   using edplugin_common::wide;
   using edplugin_common::wide_t;
-
-  auto log_vline(std::string_view fmt, std::format_args args) noexcept -> void;
+  // the log is edplugin_common's: edwide_screen.log, cut at 2 KB a line, the last session's set aside in the folder
+  // edwide_screen beside it
+  using edplugin_common::log_is_open;
+  using edplugin_common::log_line;
+  using edplugin_common::log_open;
+  using edplugin_common::log_vline;
 
   ///\brief std::format into `size` characters at `buf`, as snprintf did: cut at the end, NUL-terminated; the characters
   /// written (without the NUL). Never thrown: a text that cannot be made is empty, and logged
@@ -73,16 +77,6 @@ namespace edwide
     return format_into(&buf[0], size, fmt, std::forward<args_t>(args)...);
     }
 
-  ///\brief one line, time-stamped (UTC), cut to 1 KB, written at once under the log's lock; a line that cannot be made
-  /// is logged as such (never thrown)
-  auto log_vline(std::string_view fmt, std::format_args args) noexcept -> void;
-
-  ///\brief log_vline with the format checked against its arguments when compiled
-  template<typename... args_t>
-  auto log_line(std::format_string<args_t...> fmt, args_t &&... args) noexcept -> void
-    {
-    log_vline(fmt.get(), std::make_format_args(args...));
-    }
   ///\brief a folder edloader hands its plugins (EDLOADER_CONFIG_DIR, EDLOADER_LOG_DIR); without edloader, the dll's own
   auto directory_from(wchar_t const * variable) -> std::wstring;
   ///\brief the ini with every setting as a comment, when there is none

@@ -6,8 +6,10 @@ The sources in `src/`, namespace `edwide`, each topic a `.cc` with its header of
 (the log, the settings, the game's field of view, in `settings_log.cc`), `correction` (the side parts laid over at
 each Present; `wings_math.h` its geometry), `hooks` (Present and the DXGI factory), and `entry.cc` (the exports, the
 start, `DllMain`).
-The log: `log_line` takes a `std::format` format checked against its arguments when compiled and hands it to
-`log_vline` (`std::vformat_to` into 1 KB on the stack, the line cut there, never thrown); a wide string goes in as
+The log is edplugin_common's `log` module (using-declarations in `runtime.h`): `log_open` at the game's first call
+sets the last session's `edwide_screen.log` aside in `edwide_screen\` beside it; `log_line` takes a `std::format` format checked
+against its arguments when compiled and hands it to `log_vline` (`std::vformat_to` into 2 KB on the stack, the line
+cut there, never thrown); a wide string goes in as
 `wide(...)` (UTF-8). SRW locks are held by `exclusive_lock_t` for a scope.
 
 - `src/entry.cc`: a small chain element of edloader's. It exports `D3D11CreateDevice` and

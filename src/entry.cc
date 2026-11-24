@@ -20,8 +20,7 @@ namespace edwide
     {
     config_dir = directory_from(L"EDLOADER_CONFIG_DIR");
     log_dir = directory_from(L"EDLOADER_LOG_DIR");
-    log_file = CreateFileW((log_dir + L"\\edwide_screen.log").c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                           nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    log_open(log_dir, L"edwide_screen");  // edplugin_common's: the last session's log set aside in edwide_screen\ beside it
     log_line("edwide_screen {}", EDWIDE_VERSION);
     log_line("edplugin_common {}", EDPLUGIN_COMMON_COMMIT);
     ini_path = config_dir + L"\\edwide_screen.ini";

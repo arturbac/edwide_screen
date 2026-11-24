@@ -76,4 +76,7 @@ by cutting a little off, a larger field of view in the game draws more.
 - The mouse is not: on the side monitors the cursor and what it points at part a little (in Elite Dangerous the
   mouse is used on the middle monitor).
 - The log: `edloader\logs\edwide_screen.log` says when it is on, and why it is off ("off: the picture is 1920x1080,
-  the settings expect a width of 9000").
+  the settings expect a width of 9000"). It holds one game session; at the next start it is moved to
+  `edloader\logs\edwide_screen\edwide_screen.<UTC of its last write>.log` (two sessions ending in the same second share
+  that name: the second then stays in `edwide_screen.log` and the new one goes on after it). Without edloader both
+  are beside the dll in the game's folder, where a check of the game's files removes them.

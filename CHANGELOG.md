@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The log is edplugin_common's: the last session's `edwide_screen.log` is moved to `edwide_screen\edwide_screen.<UTC>.log` beside it at
+  the start (before, each start emptied it), and a line is cut at 2 KB (before, 1 KB).
 - Built with edplugin_common 1.0.0, the library the plugins share: a clone in the plugin's directory on the commit
   `edplugin_common.commit` pins. Without the clone the build stops with the commands that make it; another commit or
   changes in it are a warning, and an error in a release build. The log says the library's commit in a line of its

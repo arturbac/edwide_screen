@@ -11,64 +11,6 @@ namespace edwide
   {
   HMODULE self{};
   std::wstring config_dir, log_dir;
-  HANDLE log_file{INVALID_HANDLE_VALUE};
-  SRWLOCK log_lock = SRWLOCK_INIT;
-
-  namespace
-    {
-    ///\brief the room a log line is made in, and an output iterator that stops at its end
-    struct cut_buffer_t
-      {
-      char * at;
-      char * end;
-      };
-
-    struct cut_out_t
-      {
-      using difference_type = std::ptrdiff_t;
-      cut_buffer_t * b;
-
-      auto operator*() noexcept -> cut_out_t & { return *this; }
-
-      auto operator=(char c) noexcept -> cut_out_t &
-        {
-        if(b->at != b->end)
-          *b->at++ = c;
-        return *this;
-        }
-
-      auto operator++() noexcept -> cut_out_t & { return *this; }
-
-      auto operator++(int) noexcept -> cut_out_t { return *this; }
-      };
-    }  // namespace
-
-  auto log_vline(std::string_view fmt, std::format_args args) noexcept -> void
-    {
-    if(log_file == INVALID_HANDLE_VALUE)
-      return;
-    SYSTEMTIME t;
-    GetSystemTime(&t);
-    char buf[1024];
-    cut_buffer_t room{buf, buf + sizeof buf - 1};  // one byte kept for the line's end
-    try
-      {
-      std::format_to(cut_out_t{&room}, "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z ", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond,
-                     t.wMilliseconds);
-      std::vformat_to(cut_out_t{&room}, fmt, args);
-      }
-    catch(...)
-      {
-      constexpr std::string_view failed{" (log: the rest of this line could not be formatted)"};
-      for(char const c: failed)
-        if(room.at != room.end)
-          *room.at++ = c;
-      }
-    *room.at++ = '\n';
-    DWORD written{};
-    exclusive_lock_t const hold{log_lock};
-    WriteFile(log_file, buf, static_cast<DWORD>(room.at - buf), &written, nullptr);
-    }
 
   ///\brief a folder edloader hands its plugins (EDLOADER_CONFIG_DIR, EDLOADER_LOG_DIR); without edloader, the dll's own
   auto directory_from(wchar_t const * variable) -> std::wstring
