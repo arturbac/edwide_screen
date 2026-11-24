@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <string>
 #include <string_view>
-#include <vector>
 
 using namespace std::string_view_literals;
 
@@ -195,22 +194,20 @@ namespace edwide
   auto write_settings_doc() -> bool
     {
     settings_t const d{};
-    std::vector<std::string> values;  // the rows' views stay on these
-    values.reserve(std::size(settings_table));
-    std::vector<std::string> abouts;
-    abouts.reserve(std::size(settings_table));
-    std::vector<edplugin_common::setting_row_t> rows;
-    rows.reserve(std::size(settings_table));
-    for(setting_t const & setting: settings_table)
+    constexpr std::size_t count{std::size(settings_table)};
+    // the rows' views stay on these, in the object: a default is a few characters, a note goes on after the help
+    char values[count][32]{};
+    std::string abouts[count];
+    edplugin_common::setting_row_t rows[count]{};
+    for(std::size_t i{}; i != count; ++i)
       {
-      char value[32];
-      format_into(value, "{:g}", double(d.*setting.field));
-      values.emplace_back(value);
-      std::string about{setting.help};
+      setting_t const & setting{settings_table[i]};
+      std::size_t const length{format_into(values[i], "{:g}", double(d.*setting.field))};
+      abouts[i] = setting.help;
       if(not setting.doc_note.empty())
-        (about += "; "sv) += setting.doc_note;
-      abouts.push_back(std::move(about));
-      rows.push_back({setting.name, values.back(), static_cast<std::size_t>(setting.group), setting.read, setting.range, abouts.back()});
+        (abouts[i] += "; "sv) += setting.doc_note;
+      rows[i] = {setting.name, std::string_view{values[i], length}, static_cast<std::size_t>(setting.group), setting.read, setting.range,
+                 abouts[i]};
       }
     constexpr edplugin_common::settings_doc_t doc{
       "edwide_screen settings"sv,
